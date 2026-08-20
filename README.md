@@ -130,6 +130,9 @@ npm run dev
 Open your browser at `http://localhost:5173`.
 
 ---
+* **License**: MIT License
+* **Repository**: [https://github.com/AuroraBytesX/ARCHER](https://github.com/AuroraBytesX/ARCHER)
+* **Author Contact**: `tapashidhar2004@gmail.com`
 
 ## 6. Deployment Summary
 
