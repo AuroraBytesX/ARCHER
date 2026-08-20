@@ -1,0 +1,84 @@
+import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+from abc import ABC, abstractmethod
+from typing import List, Union
+import numpy as np
+from app.core.config import settings
+from app.core.logging import logger
+
+class EmbeddingProvider(ABC):
+    @abstractmethod
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        pass
+
+    @abstractmethod
+    def embed_query(self, text: str) -> List[float]:
+        pass
+
+class SentenceTransformerProvider(EmbeddingProvider):
+    _model = None
+
+    def __init__(self, model_name: str = None, device: str = None):
+        self.model_name = model_name or settings.EMBEDDING_MODEL_NAME
+        self.device = device or settings.EMBEDDING_DEVICE
+
+    def _get_model(self):
+        if SentenceTransformerProvider._model is None:
+            logger.info(f"Loading SentenceTransformer model: {self.model_name} on {self.device}")
+            from sentence_transformers import SentenceTransformer
+            SentenceTransformerProvider._model = SentenceTransformer(self.model_name, device=self.device)
+        return SentenceTransformerProvider._model
+
+    def embed_documents(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+        if not texts:
+            return []
+        model = self._get_model()
+        all_embeddings: List[List[float]] = []
+
+        # Batch processing to prevent RAM spikes
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            embeddings = model.encode(batch, normalize_embeddings=True, show_progress_bar=False)
+            all_embeddings.extend(embeddings.tolist())
+
+        return all_embeddings
+
+    def embed_query(self, text: str) -> List[float]:
+        model = self._get_model()
+        embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False)
+        return embedding.tolist()
+
+class MockFallbackEmbeddingProvider(EmbeddingProvider):
+    """
+    Fallback deterministic embedding provider for testing environments
+    if sentence-transformers is loading or in lightweight test mode.
+    """
+    def __init__(self, dim: int = 384):
+        self.dim = dim
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return [self.embed_query(t) for t in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        # Deterministic pseudo-embedding based on hash & character frequencies
+        v = np.zeros(self.dim, dtype=np.float32)
+        for i, char in enumerate(text[:self.dim]):
+            v[i % self.dim] += (ord(char) * (i + 1)) % 100
+        norm = np.linalg.norm(v)
+        if norm > 0:
+            v = v / norm
+        return v.tolist()
+
+def get_embedding_provider() -> EmbeddingProvider:
+    if settings.EMBEDDING_PROVIDER == "sentence_transformers":
+        try:
+            return SentenceTransformerProvider()
+        except Exception as e:
+            logger.warning(f"Failed to load SentenceTransformerProvider, falling back to mock provider: {e}")
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+    return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
