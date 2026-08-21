@@ -465,6 +465,7 @@ def create_collection(
     return CollectionResponse.model_validate(col)
 
 @router.delete("/collections/{collection_id}")
+@router.post("/collections/{collection_id}/delete")
 def delete_collection(
     collection_id: str,
     current_user: Optional[User] = Depends(get_current_user_optional),

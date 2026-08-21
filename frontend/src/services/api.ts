@@ -150,11 +150,19 @@ export const api = {
   },
 
   async deleteCollection(id: string): Promise<void> {
-    const res = await fetch(`${BASE_URL}/collections/${id}`, {
-      method: 'DELETE',
-      headers: getHeaders(),
-    });
-    return handleResponse<void>(res);
+    try {
+      const res = await fetch(`${BASE_URL}/collections/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      return await handleResponse<void>(res);
+    } catch {
+      const res = await fetch(`${BASE_URL}/collections/${id}/delete`, {
+        method: 'POST',
+        headers: getHeaders(),
+      });
+      return await handleResponse<void>(res);
+    }
   },
 
   // Search
