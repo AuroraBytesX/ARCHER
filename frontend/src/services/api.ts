@@ -12,7 +12,9 @@ import {
   MultiPaperSummarizeResponse,
 } from '../types';
 
-const BASE_URL = ((import.meta as any).env && (import.meta as any).env.VITE_API_URL) || '/api';
+const BASE_URL =
+  ((import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
+  'https://archer-2h04.onrender.com/api';
 
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...(extra || {}) };
