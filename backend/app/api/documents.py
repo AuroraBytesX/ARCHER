@@ -1,4 +1,4 @@
-﻿import os
+import os
 import shutil
 import zipfile
 import tempfile
@@ -325,6 +325,8 @@ def list_documents(
     # Scoped user isolation (shows user's papers + unowned public sample papers)
     if current_user:
         query = query.filter((Document.user_id == current_user.id) | (Document.user_id == None))
+    else:
+        query = query.filter(Document.user_id == None)
 
     if search:
         search_filter = or_(

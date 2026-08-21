@@ -1,6 +1,6 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Target, UploadCloud, Moon, Sun, PanelLeft, Menu, User, LogOut, ShieldCheck } from 'lucide-react';
+import { Target, Moon, Sun, PanelLeft, Menu, User, LogOut, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useUser } from '../context/UserContext';
 import { AuthModal } from './AuthModal';
@@ -56,15 +56,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2.5 md:gap-3">
-        {/* Ingest Button */}
-        <Link
-          to="/upload"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-500 hover:bg-brand-400 text-slate-950 shadow-md shadow-brand-500/20 transition-colors"
-        >
-          <UploadCloud className="w-4 h-4" />
-          <span>Upload PDFs</span>
-        </Link>
-
         {/* Theme Switcher */}
         <button
           onClick={toggleTheme}
