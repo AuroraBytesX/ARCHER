@@ -463,3 +463,19 @@ def create_collection(
     db.commit()
     db.refresh(col)
     return CollectionResponse.model_validate(col)
+
+@router.delete("/collections/{collection_id}")
+def delete_collection(
+    collection_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    col = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not col:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    if current_user and col.user_id and col.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    db.query(Document).filter(Document.collection_id == collection_id).update({"collection_id": None})
+    db.delete(col)
+    db.commit()
+    return {"message": "Collection deleted successfully", "id": collection_id}

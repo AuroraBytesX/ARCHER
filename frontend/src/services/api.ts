@@ -149,6 +149,14 @@ export const api = {
     return handleResponse<CollectionItem>(res);
   },
 
+  async deleteCollection(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/collections/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse<void>(res);
+  },
+
   // Search
   async search(params: {
     q: string;
