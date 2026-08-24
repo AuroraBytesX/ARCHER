@@ -2,6 +2,17 @@ import os
 from typing import List, Union
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+_base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+_env_candidates = [
+    os.path.join(_base_dir, ".env"),
+    os.path.abspath(os.path.join(_base_dir, "../.env")),
+    ".env"
+]
+for _p in _env_candidates:
+    if os.path.exists(_p):
+        load_dotenv(_p, override=True)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "ARCHER (ResearchAI)"
@@ -38,7 +49,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 384
 
     # Ingestion & Chunking
-    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../uploads")))
+    UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads"))
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "800"))
     CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "120"))
 

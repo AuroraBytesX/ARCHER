@@ -7,6 +7,7 @@ from app.services.summary_service import SummaryService
 router = APIRouter()
 
 @router.get("/summaries/{document_id}", response_model=SummaryResponse)
+@router.get("/documents/{document_id}/summary", response_model=SummaryResponse)
 async def get_summary(document_id: str, db: Session = Depends(get_db)):
     svc = SummaryService(db)
     try:
@@ -15,6 +16,7 @@ async def get_summary(document_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.post("/summaries/{document_id}", response_model=SummaryResponse)
+@router.post("/documents/{document_id}/summary", response_model=SummaryResponse)
 async def generate_summary(
     document_id: str,
     payload: GenerateSummaryRequest = Body(default=GenerateSummaryRequest()),

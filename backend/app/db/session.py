@@ -7,12 +7,15 @@ from app.core.logging import logger
 connect_args = {}
 if "sqlite" in settings.DATABASE_URL:
     connect_args["check_same_thread"] = False
+elif "postgresql" in settings.DATABASE_URL:
+    connect_args["connect_timeout"] = 15
 
 engine = create_engine(
     settings.DATABASE_URL,
     echo=False,
     connect_args=connect_args,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

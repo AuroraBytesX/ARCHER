@@ -1,19 +1,24 @@
 import os
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-
 from abc import ABC, abstractmethod
 from typing import List, Union
 import numpy as np
+import torch
 from app.core.config import settings
 from app.core.logging import logger
 
+# Accelerate CPU tensor multiplication across cores
+_num_threads = min(8, os.cpu_count() or 4)
+os.environ["OPENBLAS_NUM_THREADS"] = str(_num_threads)
+os.environ["OMP_NUM_THREADS"] = str(_num_threads)
+os.environ["MKL_NUM_THREADS"] = str(_num_threads)
+try:
+    torch.set_num_threads(_num_threads)
+except Exception:
+    pass
+
 class EmbeddingProvider(ABC):
     @abstractmethod
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: List[str], batch_size: int = 64) -> List[List[float]]:
         pass
 
     @abstractmethod
@@ -34,23 +39,30 @@ class SentenceTransformerProvider(EmbeddingProvider):
             SentenceTransformerProvider._model = SentenceTransformer(self.model_name, device=self.device)
         return SentenceTransformerProvider._model
 
-    def embed_documents(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_documents(self, texts: List[str], batch_size: int = 64) -> List[List[float]]:
         if not texts:
             return []
         model = self._get_model()
         all_embeddings: List[List[float]] = []
 
-        # Batch processing to prevent RAM spikes
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            embeddings = model.encode(batch, normalize_embeddings=True, show_progress_bar=False)
-            all_embeddings.extend(embeddings.tolist())
+        with torch.inference_mode():
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                embeddings = model.encode(
+                    batch,
+                    batch_size=batch_size,
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                    convert_to_numpy=True
+                )
+                all_embeddings.extend(embeddings.tolist())
 
         return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
         model = self._get_model()
-        embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False)
+        with torch.inference_mode():
+            embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False, convert_to_numpy=True)
         return embedding.tolist()
 
 class MockFallbackEmbeddingProvider(EmbeddingProvider):

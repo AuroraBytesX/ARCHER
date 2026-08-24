@@ -14,7 +14,7 @@ import {
 
 const BASE_URL =
   ((import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
-  'https://archer-2h04.onrender.com/api';
+  (import.meta.env.DEV ? '/api' : 'https://archer-2h04.onrender.com/api');
 
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...(extra || {}) };
@@ -27,16 +27,34 @@ function getHeaders(extra?: Record<string, string>): Record<string, string> {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
   if (!response.ok) {
-    let errorDetail = 'API Request Failed';
-    try {
-      const errJson = await response.json();
-      errorDetail = errJson.detail || errJson.message || JSON.stringify(errJson);
-    } catch {
-      errorDetail = await response.text();
+    let errorDetail = `HTTP error ${response.status}`;
+    if (contentType.includes('application/json')) {
+      try {
+        const errJson = await response.json();
+        errorDetail = errJson.detail || errJson.message || JSON.stringify(errJson);
+      } catch {
+        // ignore
+      }
+    } else {
+      const text = await response.text();
+      if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<!doctype')) {
+        errorDetail = `Backend server is starting up (HTTP ${response.status}). Please wait a few seconds and refresh.`;
+      } else {
+        errorDetail = text.slice(0, 200) || `HTTP error ${response.status}`;
+      }
     }
-    throw new Error(errorDetail || `HTTP error ${response.status}`);
+    throw new Error(errorDetail);
   }
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<!doctype')) {
+      throw new Error('Backend server is waking up or initializing. Please retry in a few moments.');
+    }
+  }
+
   return response.json();
 }
 
@@ -235,7 +253,7 @@ export const api = {
 
   // Summaries
   async getDocumentSummary(documentId: string): Promise<PaperSummary> {
-    const res = await fetch(`${BASE_URL}/documents/${documentId}/summary`, {
+    const res = await fetch(`${BASE_URL}/summaries/${documentId}`, {
       headers: getHeaders(),
     });
     return handleResponse<PaperSummary>(res);
@@ -246,10 +264,11 @@ export const api = {
   },
 
   async generateDocumentSummary(documentId: string, force?: boolean): Promise<PaperSummary> {
-    const url = `${BASE_URL}/documents/${documentId}/summary${force ? '?force=true' : ''}`;
+    const url = `${BASE_URL}/summaries/${documentId}`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ force_regenerate: !!force }),
     });
     return handleResponse<PaperSummary>(res);
   },

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -365,9 +365,11 @@ export const PapersPage: React.FC = () => {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 pt-1">
                       <span>{doc.page_count} Pages</span>
-                      <span>• Filename: {doc.filename}</span>
+                      <span className="truncate max-w-[200px] sm:max-w-xs md:max-w-md inline-block align-bottom" title={doc.filename}>
+                        • Filename: {doc.filename}
+                      </span>
                       <span>• Ingested: {formatDate(doc.created_at)}</span>
                     </div>
                   </div>

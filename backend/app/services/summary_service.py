@@ -1,4 +1,4 @@
-﻿import json
+import json
 import re
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
@@ -55,7 +55,33 @@ class SummaryService:
         # Retrieve key sections from chunks
         chunks = self.db.query(Chunk).filter(Chunk.document_id == document_id).order_by(Chunk.chunk_index).all()
         if not chunks:
-            raise ValueError(f"No text chunks found for document {document_id}.")
+            parsed = self._heuristic_summary(doc, [])
+            summary_record = Summary(
+                document_id=doc.id,
+                objective=parsed.get("objective"),
+                methodology=parsed.get("methodology"),
+                datasets=parsed.get("datasets"),
+                findings=parsed.get("findings"),
+                limitations=parsed.get("limitations"),
+                future_work=parsed.get("future_work"),
+                summary=parsed.get("summary", f"Summary for {doc.title}.")
+            )
+            self.db.add(summary_record)
+            self.db.commit()
+            self.db.refresh(summary_record)
+            return SummaryResponse(
+                id=summary_record.id,
+                document_id=summary_record.document_id,
+                paper_title=doc.title,
+                objective=summary_record.objective,
+                methodology=summary_record.methodology,
+                datasets=summary_record.datasets,
+                findings=summary_record.findings,
+                limitations=summary_record.limitations,
+                future_work=summary_record.future_work,
+                summary=summary_record.summary,
+                created_at=summary_record.created_at
+            )
 
         # Select relevant chunks (Abstract, Intro, Method, Results, Limitations, Conclusion)
         selected_text = []

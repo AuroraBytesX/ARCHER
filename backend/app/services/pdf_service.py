@@ -36,11 +36,17 @@ def clean_extracted_text(text: str) -> str:
     return text.strip()
 
 def detect_section_header(line: str) -> Optional[str]:
-    cleaned = line.strip().lower()
-    if len(cleaned) > 80:
+    if not line:
+        return None
+    cleaned = line.strip()
+    if len(cleaned) == 0 or len(cleaned) > 60:
+        return None
+    cleaned_lower = cleaned.lower()
+    first_char = cleaned_lower[0]
+    if not (first_char.isalpha() or first_char.isdigit() or first_char in ['i', 'v', 'x']):
         return None
     for pattern, section_name in SECTION_PATTERNS:
-        if re.search(pattern, cleaned, re.IGNORECASE):
+        if re.search(pattern, cleaned_lower, re.IGNORECASE):
             return section_name
     return None
 
@@ -145,11 +151,29 @@ class PDFExtractionService:
 
     @staticmethod
     def _extract_abstract_from_text(first_page_text: str) -> Optional[str]:
-        match = re.search(r"(?:abstract|summary)\s*[:\n]\s*(.*?)(?=\n\s*(?:1\.?|i\.?)?\s*introduction|\n\s*keywords|\n\s*index terms|$)", first_page_text, re.IGNORECASE | re.DOTALL)
-        if match:
-            abstract_text = match.group(1).strip()
-            if len(abstract_text) > 40:
-                return abstract_text[:2000]
+        if not first_page_text:
+            return None
+        lower = first_page_text.lower()
+        abs_pos = lower.find("abstract")
+        if abs_pos == -1:
+            abs_pos = lower.find("summary")
+        if abs_pos == -1:
+            return None
+        
+        start_idx = abs_pos + len("abstract")
+        remaining = first_page_text[start_idx:]
+        rem_lower = remaining.lower()
+        
+        end_idx = len(remaining)
+        for term in ["\n1. ", "\n1 ", "\ni. ", "\nintroduction", "\nkeywords", "\nindex terms", "\n1. introduction", "\ni. introduction"]:
+            pos = rem_lower.find(term)
+            if pos != -1 and pos < end_idx:
+                end_idx = pos
+                
+        candidate = remaining[:end_idx].strip()
+        candidate = re.sub(r"^[:\-\s]+", "", candidate).strip()
+        if len(candidate) > 40:
+            return candidate[:2000]
         return None
 
     @staticmethod

@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -94,19 +94,23 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
             message=f"If an account exists for {email_clean}, recovery instructions have been dispatched."
         )
 
-    reset_token = secrets.token_hex(16)
+    # Generate a clean 6-digit numeric OTP code
+    reset_token = f"{secrets.randbelow(900000) + 100000}"
     user.reset_token = reset_token
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=2)
     db.commit()
 
-    logger.info(f"Password reset token generated for {email_clean}")
+    logger.info(f"6-digit password reset OTP generated for {email_clean}: {reset_token}")
     
-    subject = "ARCHER: Password Recovery Request"
+    subject = "ARCHER: Your 6-Digit Password Reset Code"
     body_text = (
         f"Hello {user.name or 'Researcher'},\n\n"
         f"You requested a password reset for your ARCHER account ({email_clean}).\n\n"
-        f"Your password reset token is:\n{reset_token}\n\n"
-        f"This token is valid for 2 hours. Use it in the ARCHER reset password window to set your new password.\n\n"
+        f"Your 6-Digit Verification Code is:\n"
+        f"----------------------------------------\n"
+        f"             {reset_token}\n"
+        f"----------------------------------------\n\n"
+        f"This 6-digit code is valid for 2 hours. Enter this code on the ARCHER reset password window to set your new password.\n\n"
         f"If you did not request this change, you can safely ignore this email.\n\n"
         f"Best regards,\n"
         f"The ARCHER Research Intelligence Team"
@@ -116,7 +120,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     
     return ForgotPasswordResponse(
         email=email_clean,
-        message=f"Password recovery instructions have been dispatched to {email_clean}."
+        message=f"A 6-digit recovery code has been dispatched to {email_clean}."
     )
 
 @router.post("/auth/reset-password", response_model=ResetPasswordResponse, dependencies=[Depends(rate_limiter)])
@@ -126,13 +130,14 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid email or recovery token."
+            detail="Invalid email or recovery code."
         )
 
-    if not user.reset_token or user.reset_token != payload.token:
+    clean_token = payload.token.strip()
+    if not user.reset_token or user.reset_token.strip() != clean_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired recovery token."
+            detail="Invalid or expired 6-digit recovery code."
         )
 
     if user.reset_token_expires and user.reset_token_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):

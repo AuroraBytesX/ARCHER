@@ -11,7 +11,8 @@ import {
   Plus,
   Layers,
   ArrowRight,
-  FolderArchive
+  FolderArchive,
+  X
 } from 'lucide-react';
 import { api } from '../services/api';
 import { DocumentItem, CollectionItem, BatchUploadResponse } from '../types';
@@ -40,17 +41,25 @@ export const UploadPage: React.FC = () => {
   const [zipReport, setZipReport] = useState<BatchUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
+  const pollTimerRef = useRef<any>(null);
+  const isPollingRef = useRef<boolean>(false);
 
   useEffect(() => {
     loadCollections();
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+    };
   }, []);
 
   const loadCollections = async () => {
     try {
       const data = await api.getCollections();
-      setCollections(data);
+      setCollections(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error(e);
+      console.warn('Collections currently using default workspace:', e);
+      setCollections([]);
     }
   };
 
@@ -78,38 +87,26 @@ export const UploadPage: React.FC = () => {
         setSelectedCollection('');
       }
     } catch (err: any) {
-      alert(`Failed to delete collection: ${err.message}`);
+      alert(err.message || 'Failed to delete collection');
     }
   };
 
-  const handleFileSelection = (fileList: FileList | null) => {
-    if (!fileList) return;
-    const newUploads: UploadItem[] = [];
+  const handleFileSelection = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
     
-    Array.from(fileList).forEach((f) => {
-      const lowerName = f.name.toLowerCase();
-      if (lowerName.endsWith('.pdf')) {
-        newUploads.push({
-          id: Math.random().toString(36).substring(7),
-          file: f,
-          name: f.name,
-          size: f.size,
-          isZip: false,
-          status: 'PENDING',
-        });
-      } else if (lowerName.endsWith('.zip')) {
-        newUploads.push({
-          id: Math.random().toString(36).substring(7),
-          file: f,
-          name: f.name,
-          size: f.size,
-          isZip: true,
-          status: 'PENDING',
-        });
-      }
-    });
+    const newItems: UploadItem[] = fileArray.map((file) => ({
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      file,
+      name: file.name,
+      size: file.size,
+      isZip: file.name.toLowerCase().endsWith('.zip'),
+      status: 'PENDING',
+    }));
 
-    setItems((prev) => [...prev, ...newUploads]);
+    setItems((prev) => [...prev, ...newItems]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (zipInputRef.current) zipInputRef.current.value = '';
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -123,68 +120,56 @@ export const UploadPage: React.FC = () => {
     if (pendingItems.length === 0) return;
 
     setIsUploading(true);
-
-    // Process ZIP archives first
-    const zipItems = pendingItems.filter((i) => i.isZip && i.file);
-    const pdfItems = pendingItems.filter((i) => !i.isZip && i.file);
-
-    // Update status to uploading
     setItems((prev) =>
       prev.map((i) => (i.status === 'PENDING' ? { ...i, status: 'UPLOADING' } : i))
     );
 
-    // Handle ZIP files
-    for (const zItem of zipItems) {
-      try {
-        const res: BatchUploadResponse = await api.uploadZipDocuments(zItem.file!, selectedCollection || undefined);
-        setZipReport(res);
-        
-        // Remove zip placeholder and add unpacked items
-        const unpackedItems: UploadItem[] = res.results.map((r) => ({
-          id: Math.random().toString(36).substring(7),
-          name: r.filename,
-          size: 0,
-          isZip: false,
-          status: r.status === 'DUPLICATE' ? 'DUPLICATE' : r.status === 'SUCCESS' ? 'EXTRACTING' : 'FAILED',
-          documentId: r.document?.id,
-          error: r.status === 'FAILED' ? r.message : undefined,
-          duplicateNotice: r.status === 'DUPLICATE' ? r.message : undefined,
-        }));
+    const pdfItems = pendingItems.filter((i) => !i.isZip && i.file);
+    const zipItems = pendingItems.filter((i) => i.isZip && i.file);
 
-        setItems((prev) => [
-          ...prev.filter((i) => i.id !== zItem.id),
-          ...unpackedItems,
-        ]);
+    // Process individual ZIP files
+    for (const zipItem of zipItems) {
+      if (!zipItem.file) continue;
+      try {
+        const report = await api.uploadZipDocuments(zipItem.file, selectedCollection || undefined);
+        setZipReport(report);
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === zipItem.id
+              ? {
+                  ...i,
+                  status: 'INDEXED',
+                  duplicateNotice: `Extracted ${report.results.length} files`,
+                }
+              : i
+          )
+        );
       } catch (err: any) {
         setItems((prev) =>
           prev.map((i) =>
-            i.id === zItem.id
-              ? { ...i, status: 'FAILED', error: err.message || 'ZIP upload failed' }
-              : i
+            i.id === zipItem.id ? { ...i, status: 'FAILED', error: err.message || 'ZIP extraction failed' } : i
           )
         );
       }
     }
 
-    // Handle standard PDF files
+    // Process bulk/individual PDFs
     if (pdfItems.length > 0) {
-      const filesToUpload = pdfItems.map((i) => i.file!).filter(Boolean);
+      const filesToUpload = pdfItems.map((i) => i.file as File);
       try {
-        const responses = await api.uploadDocuments(filesToUpload, selectedCollection || undefined);
-
+        const results = await api.uploadDocuments(filesToUpload, selectedCollection || undefined);
         setItems((prev) =>
           prev.map((item) => {
-            if (item.isZip) return item;
-            const matchedDoc = responses.find(
+            const matchedDoc = results.find(
               (r) => r.filename.toLowerCase() === item.name.toLowerCase()
             );
             if (matchedDoc) {
-              const isDup = matchedDoc.status === 'READY';
+              const isReady = matchedDoc.status === 'READY';
               return {
                 ...item,
-                status: isDup ? 'DUPLICATE' : 'EXTRACTING',
+                status: isReady ? 'INDEXED' : 'EXTRACTING',
                 documentId: matchedDoc.id,
-                duplicateNotice: isDup ? `Already indexed: ${matchedDoc.title}` : undefined,
+                duplicateNotice: isReady ? `Indexed: ${matchedDoc.title}` : undefined,
               };
             }
             return item;
@@ -206,18 +191,33 @@ export const UploadPage: React.FC = () => {
   };
 
   const pollProcessingStatuses = () => {
-    const interval = setInterval(async () => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+    }
+
+    let pollCount = 0;
+    pollTimerRef.current = setInterval(async () => {
+      pollCount += 1;
+      if (pollCount > 30) {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        return;
+      }
+
+      let hasActive = false;
       setItems((prev) => {
-        const stillActive = prev.some(
-          (i) => i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING'
+        hasActive = prev.some(
+          (i) => i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING' || i.status === 'UPLOADING'
         );
-        if (!stillActive) {
-          clearInterval(interval);
+        if (!hasActive && pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
         }
         return prev;
       });
 
+      if (!hasActive || isPollingRef.current) return;
+
       try {
+        isPollingRef.current = true;
         const docsRes = await api.getDocuments({ limit: 50 });
         const docMap = new Map(docsRes.items.map((d) => [d.id, d]));
 
@@ -240,9 +240,11 @@ export const UploadPage: React.FC = () => {
           })
         );
       } catch (e) {
-        console.error(e);
+        console.warn('Status poll warning:', e);
+      } finally {
+        isPollingRef.current = false;
       }
-    }, 2500);
+    }, 2000);
   };
 
   const handleRetry = async (item: UploadItem) => {
@@ -263,48 +265,43 @@ export const UploadPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 w-full min-w-0">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Document Ingestion Pipeline</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">Document Ingestion Pipeline</h1>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
           Upload individual PDFs, multiple PDFs in bulk, or ZIP archives containing research papers.
         </p>
 
         {/* Human-readable pipeline progression */}
-        <div className="mt-4 p-3 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between text-[11px] gap-2 font-medium shadow-xs">
-          <span className="flex items-center gap-1.5 text-brand-700 dark:text-brand-400 font-semibold">
-            <span className="w-5 h-5 rounded-full bg-brand-500/20 flex items-center justify-center text-[10px]">1</span>
-            Upload PDF
+        <div className="mt-4 p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between text-[10px] sm:text-[11px] gap-1.5 sm:gap-2 font-medium shadow-xs overflow-x-auto">
+          <span className="flex items-center gap-1 text-brand-700 dark:text-brand-400 font-semibold shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-brand-500/20 flex items-center justify-center text-[9px] sm:text-[10px]">1</span>
+            Upload
           </span>
           <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px]">2</span>
+          <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px]">2</span>
             Validate
           </span>
           <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px]">3</span>
-            Extract Text
+          <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px]">3</span>
+            Extract
           </span>
           <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px]">4</span>
-            Chunk Sections
+          <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px]">4</span>
+            Chunk
           </span>
           <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px]">5</span>
-            Embed Chunks
+          <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px]">5</span>
+            Embed
           </span>
           <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-            <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[10px]">6</span>
-            Store pgvector
-          </span>
-          <span className="text-slate-400 dark:text-slate-600">&rarr;</span>
-          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
-            <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px]">7</span>
-            Ready for RAG
+          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">
+            <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] sm:text-[10px]">6</span>
+            Indexed
           </span>
         </div>
       </div>
@@ -419,10 +416,10 @@ export const UploadPage: React.FC = () => {
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-3xl p-10 text-center transition-all cursor-pointer ${
+        className={`border-2 border-dashed rounded-2xl sm:rounded-3xl p-6 sm:p-10 text-center transition-all cursor-pointer ${
           isDragging
-            ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-            : 'border-slate-300 dark:border-slate-800 hover:border-brand-400 dark:hover:border-slate-700 bg-white dark:bg-slate-900/30'
+            ? 'border-brand-500 bg-brand-50/80 dark:bg-brand-500/10'
+            : 'border-slate-300 dark:border-slate-800 hover:border-brand-400 dark:hover:border-brand-500 bg-white dark:bg-slate-900/60 shadow-xs'
         }`}
       >
         <input
@@ -433,22 +430,22 @@ export const UploadPage: React.FC = () => {
           className="hidden"
           onChange={(e) => handleFileSelection(e.target.files)}
         />
-        <div className="max-w-md mx-auto space-y-4 pointer-events-none">
-          <div className="w-14 h-14 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto shadow-inner">
-            <UploadCloud className="w-7 h-7" />
+        <div className="max-w-md mx-auto space-y-3 sm:space-y-4 pointer-events-none">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto shadow-inner">
+            <UploadCloud className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">
               Drag & Drop Research Papers (PDFs or ZIP)
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Supports single PDF, multiple PDFs, or ZIP archives containing PDFs. SHA-256 duplicate verification enabled.
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Supports single PDF, multiple PDFs, or ZIP archives containing PDFs.
             </p>
           </div>
-          <div className="flex items-center justify-center gap-3 pt-2">
+          <div className="flex items-center justify-center gap-3 pt-1">
             <button
               type="button"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               <FileText className="w-3.5 h-3.5" />
               Browse PDF / ZIP Files
@@ -507,100 +504,144 @@ export const UploadPage: React.FC = () => {
           </div>
 
           <div className="rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800/60 overflow-hidden shadow-sm">
-            {items.map((item) => (
-              <div key={item.id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-                    {item.isZip ? <FolderArchive className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate">{item.name}</h4>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {item.size > 0 && <span>{(item.size / 1024 / 1024).toFixed(2)} MB</span>}
-                      {item.duplicateNotice && (
-                        <span className="text-amber-600 dark:text-amber-400 font-medium">• {item.duplicateNotice}</span>
+            {items.map((item) => {
+              const progressPct =
+                item.status === 'INDEXED' || item.status === 'DUPLICATE'
+                  ? 100
+                  : item.status === 'EMBEDDING'
+                  ? 85
+                  : item.status === 'CHUNKING'
+                  ? 65
+                  : item.status === 'EXTRACTING'
+                  ? 35
+                  : item.status === 'UPLOADING'
+                  ? 15
+                  : item.status === 'FAILED'
+                  ? 100
+                  : 0;
+
+              return (
+                <div key={item.id} className="p-3.5 sm:p-4 space-y-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+                        {item.isZip ? <FolderArchive className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-200 truncate max-w-[220px] sm:max-w-xs md:max-w-md block" title={item.name}>
+                          {item.name}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                          {item.size > 0 && <span>{(item.size / 1024 / 1024).toFixed(2)} MB</span>}
+                          {item.duplicateNotice && (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium truncate">• {item.duplicateNotice}</span>
+                          )}
+                          {item.error && <span className="text-rose-600 dark:text-rose-400 font-medium truncate">• {item.error}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
+                      {/* Processing States */}
+                      {item.status === 'PENDING' && (
+                        <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          0% Queued
+                        </span>
                       )}
-                      {item.error && <span className="text-rose-600 dark:text-rose-400 font-medium">• {item.error}</span>}
+                      {item.status === 'UPLOADING' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          15% Uploading
+                        </span>
+                      )}
+                      {item.status === 'EXTRACTING' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          35% Extracting & Parsing
+                        </span>
+                      )}
+                      {item.status === 'CHUNKING' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 animate-pulse">
+                          <Cpu className="w-3 h-3 animate-spin" />
+                          65% Token Chunking
+                        </span>
+                      )}
+                      {item.status === 'EMBEDDING' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 animate-pulse">
+                          <Cpu className="w-3 h-3 animate-spin" />
+                          85% Vector Embedding
+                        </span>
+                      )}
+                      {item.status === 'INDEXED' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+                          <CheckCircle2 className="w-3 h-3" />
+                          100% Ready & Indexed
+                        </span>
+                      )}
+                      {item.status === 'DUPLICATE' && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                          <CheckCircle2 className="w-3 h-3" />
+                          100% Already Exists
+                        </span>
+                      )}
+                      {item.status === 'FAILED' && (
+                        <button
+                          onClick={() => handleRetry(item)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 transition-colors"
+                          title="Retry processing"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Retry
+                        </button>
+                      )}
+
+                      {item.documentId && item.status === 'INDEXED' && (
+                        <Link
+                          to={`/papers/${item.documentId}`}
+                          className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                          title="Open Paper"
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </Link>
+                      )}
+
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+
+                  {/* Real-time Progress Bar */}
+                  {item.status !== 'PENDING' && (
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${
+                          item.status === 'INDEXED' || item.status === 'DUPLICATE'
+                            ? 'bg-emerald-500 w-full'
+                            : item.status === 'FAILED'
+                            ? 'bg-rose-500 w-full'
+                            : item.status === 'EMBEDDING'
+                            ? 'bg-gradient-to-r from-amber-500 to-brand-500 w-[85%]'
+                            : item.status === 'CHUNKING'
+                            ? 'bg-gradient-to-r from-indigo-500 to-blue-500 w-[65%]'
+                            : item.status === 'EXTRACTING'
+                            ? 'bg-gradient-to-r from-purple-500 to-indigo-500 w-[35%]'
+                            : 'bg-blue-500 w-[15%]'
+                        }`}
+                      />
+                    </div>
+                  )}
                 </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  {/* Processing States */}
-                  {item.status === 'PENDING' && (
-                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                      Ready to Upload
-                    </span>
-                  )}
-                  {item.status === 'UPLOADING' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Uploading
-                    </span>
-                  )}
-                  {item.status === 'EXTRACTING' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 animate-pulse">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Extracting & Sections
-                    </span>
-                  )}
-                  {item.status === 'CHUNKING' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 animate-pulse">
-                      <Cpu className="w-3 h-3 animate-spin" />
-                      Token Chunking
-                    </span>
-                  )}
-                  {item.status === 'EMBEDDING' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 animate-pulse">
-                      <Cpu className="w-3 h-3 animate-spin" />
-                      Vector Embedding
-                    </span>
-                  )}
-                  {item.status === 'INDEXED' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Indexed & Ready
-                    </span>
-                  )}
-                  {item.status === 'DUPLICATE' && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Already Exists
-                    </span>
-                  )}
-                  {item.status === 'FAILED' && (
-                    <button
-                      onClick={() => handleRetry(item)}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 transition-colors"
-                      title="Retry processing"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      Retry
-                    </button>
-                  )}
-
-                  {item.documentId && item.status === 'INDEXED' && (
-                    <Link
-                      to={`/papers/${item.documentId}`}
-                      className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-                      title="Open Paper"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  )}
-
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
     </div>
   );
 };
+
+export default UploadPage;
