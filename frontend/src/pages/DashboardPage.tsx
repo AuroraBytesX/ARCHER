@@ -32,15 +32,22 @@ export const DashboardPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [docsRes, convsRes, colsRes] = await Promise.all([
+      const [docsSettled, convsSettled, colsSettled] = await Promise.allSettled([
         api.getDocuments({ limit: 10 }),
         api.getConversations(),
         api.getCollections(),
       ]);
-      setDocuments(docsRes.items || []);
-      setTotalPapersCount(docsRes.total || 0);
-      setConversations(convsRes || []);
-      setCollectionsCount(colsRes.length || 0);
+
+      if (docsSettled.status === 'fulfilled') {
+        setDocuments(docsSettled.value.items || []);
+        setTotalPapersCount(docsSettled.value.total || 0);
+      }
+      if (convsSettled.status === 'fulfilled') {
+        setConversations(convsSettled.value || []);
+      }
+      if (colsSettled.status === 'fulfilled') {
+        setCollectionsCount(colsSettled.value.length || 0);
+      }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
