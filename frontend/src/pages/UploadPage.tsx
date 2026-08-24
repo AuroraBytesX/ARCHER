@@ -32,6 +32,7 @@ interface UploadItem {
 
 export const UploadPage: React.FC = () => {
   const [items, setItems] = useState<UploadItem[]>([]);
+  const [recentDocs, setRecentDocs] = useState<DocumentItem[]>([]);
   const [collections, setCollections] = useState<CollectionItem[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
   const [newCollectionName, setNewCollectionName] = useState('');
@@ -46,6 +47,7 @@ export const UploadPage: React.FC = () => {
 
   useEffect(() => {
     loadCollections();
+    loadRecentDocs();
     return () => {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
@@ -53,12 +55,20 @@ export const UploadPage: React.FC = () => {
     };
   }, []);
 
+  const loadRecentDocs = async () => {
+    try {
+      const res = await api.getDocuments({ limit: 6 });
+      setRecentDocs(res.items || []);
+    } catch {
+      // ignore
+    }
+  };
+
   const loadCollections = async () => {
     try {
       const data = await api.getCollections();
       setCollections(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.warn('Collections currently using default workspace:', e);
+    } catch {
       setCollections([]);
     }
   };
@@ -637,6 +647,49 @@ export const UploadPage: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Persistent Library Papers (Visible across refreshes) */}
+      {recentDocs.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Library Papers ({recentDocs.length} Recent)</span>
+            </h3>
+            <Link
+              to="/papers"
+              className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium"
+            >
+              View Full Library &rarr;
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recentDocs.map((doc) => (
+              <Link
+                key={doc.id}
+                to={`/papers/${doc.id}`}
+                className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-brand-500/50 hover:shadow-xs transition-all flex flex-col justify-between gap-2 group"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                      {doc.status}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">{doc.page_count} Pages</span>
+                  </div>
+                  <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 line-clamp-2 leading-snug">
+                    {doc.title}
+                  </h4>
+                </div>
+                <div className="text-[10px] text-slate-400 truncate pt-1 border-t border-slate-100 dark:border-slate-800">
+                  {doc.filename}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       )}

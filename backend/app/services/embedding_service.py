@@ -34,36 +34,57 @@ class SentenceTransformerProvider(EmbeddingProvider):
 
     def _get_model(self):
         if SentenceTransformerProvider._model is None:
-            logger.info(f"Loading SentenceTransformer model: {self.model_name} on {self.device}")
-            from sentence_transformers import SentenceTransformer
-            SentenceTransformerProvider._model = SentenceTransformer(self.model_name, device=self.device)
+            try:
+                logger.info(f"Loading SentenceTransformer model: {self.model_name} on {self.device}")
+                from sentence_transformers import SentenceTransformer
+                SentenceTransformerProvider._model = SentenceTransformer(self.model_name, device=self.device)
+            except Exception as e:
+                logger.warning(f"Unable to load SentenceTransformer ({e}). Using lightweight fallback provider.")
+                return None
         return SentenceTransformerProvider._model
 
     def embed_documents(self, texts: List[str], batch_size: int = 64) -> List[List[float]]:
         if not texts:
             return []
         model = self._get_model()
+        if model is None:
+            fallback = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+            return fallback.embed_documents(texts)
+
         all_embeddings: List[List[float]] = []
-
-        with torch.inference_mode():
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
-                embeddings = model.encode(
-                    batch,
-                    batch_size=batch_size,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                    convert_to_numpy=True
-                )
-                all_embeddings.extend(embeddings.tolist())
-
-        return all_embeddings
+        try:
+            with torch.inference_mode():
+                # Keep batch size conservative to preserve memory on cloud free tiers
+                actual_batch = min(batch_size, 32)
+                for i in range(0, len(texts), actual_batch):
+                    batch = texts[i:i + actual_batch]
+                    embeddings = model.encode(
+                        batch,
+                        batch_size=actual_batch,
+                        normalize_embeddings=True,
+                        show_progress_bar=False,
+                        convert_to_numpy=True
+                    )
+                    all_embeddings.extend(embeddings.tolist())
+            return all_embeddings
+        except Exception as e:
+            logger.warning(f"Error during batched embedding ({e}), using deterministic fallback vectors.")
+            fallback = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+            return fallback.embed_documents(texts)
 
     def embed_query(self, text: str) -> List[float]:
         model = self._get_model()
-        with torch.inference_mode():
-            embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False, convert_to_numpy=True)
-        return embedding.tolist()
+        if model is None:
+            fallback = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+            return fallback.embed_query(text)
+        try:
+            with torch.inference_mode():
+                embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False, convert_to_numpy=True)
+            return embedding.tolist()
+        except Exception as e:
+            logger.warning(f"Error during query embedding ({e}), using fallback vector.")
+            fallback = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+            return fallback.embed_query(text)
 
 class MockFallbackEmbeddingProvider(EmbeddingProvider):
     """

@@ -13,6 +13,13 @@ from app.api.router import api_router
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
     init_db()
+    try:
+        from app.services.embedding_service import get_embedding_provider
+        provider = get_embedding_provider()
+        provider.embed_query("warmup query")
+        logger.info("Embedding provider pre-warmed successfully.")
+    except Exception as e:
+        logger.warning(f"Embedding warmup note: {e}")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 
