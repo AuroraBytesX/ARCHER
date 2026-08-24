@@ -1,4 +1,4 @@
-﻿import json
+import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -40,42 +40,48 @@ async def chat_with_research_ai(
 
     return response
 
+from sqlalchemy.orm import joinedload
+
 @router.get("/conversations", response_model=List[ConversationResponse])
 def list_conversations(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Conversation)
-    if current_user:
-        query = query.filter((Conversation.user_id == current_user.id) | (Conversation.user_id == None))
-    
-    convs = query.order_by(desc(Conversation.created_at)).limit(50).all()
-    results = []
-    for c in convs:
-        msg_items = []
-        for m in c.messages:
-            cits = []
-            if m.citations_json:
-                try:
-                    cits_raw = json.loads(m.citations_json)
-                    cits = [CitationItem(**ci) for ci in cits_raw]
-                except Exception:
-                    cits = []
-            msg_items.append(MessageResponse(
-                id=m.id,
-                conversation_id=m.conversation_id,
-                role=m.role,
-                content=m.content,
-                citations=cits,
-                created_at=m.created_at
+    try:
+        query = db.query(Conversation).options(joinedload(Conversation.messages))
+        if current_user:
+            query = query.filter((Conversation.user_id == current_user.id) | (Conversation.user_id == None))
+        
+        convs = query.order_by(desc(Conversation.created_at)).limit(50).all()
+        results = []
+        for c in convs:
+            msg_items = []
+            for m in (c.messages or []):
+                cits = []
+                if m.citations_json:
+                    try:
+                        cits_raw = json.loads(m.citations_json)
+                        cits = [CitationItem(**ci) for ci in cits_raw]
+                    except Exception:
+                        cits = []
+                msg_items.append(MessageResponse(
+                    id=m.id,
+                    conversation_id=m.conversation_id,
+                    role=m.role,
+                    content=m.content,
+                    citations=cits,
+                    created_at=m.created_at
+                ))
+            results.append(ConversationResponse(
+                id=c.id,
+                title=c.title,
+                created_at=c.created_at,
+                messages=msg_items
             ))
-        results.append(ConversationResponse(
-            id=c.id,
-            title=c.title,
-            created_at=c.created_at,
-            messages=msg_items
-        ))
-    return results
+        return results
+    except Exception as e:
+        logger.warning(f"Error fetching conversations: {e}")
+        return []
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
 def get_conversation(
