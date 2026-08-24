@@ -14,13 +14,11 @@ import {
 
 const BASE_URL =
   ((import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
-  (import.meta.env.DEV ? '/api' : 'https://archer-2h04.onrender.com/api');
+  (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : 'https://archer-2h04.onrender.com/api');
 
 function buildUrl(endpoint: string, params?: Record<string, string | number | undefined>): string {
-  const isAbsolute = BASE_URL.startsWith('http://') || BASE_URL.startsWith('https://');
-  const base = isAbsolute ? BASE_URL : `${window.location.origin}${BASE_URL}`;
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = new URL(`${base}${normalizedEndpoint}`);
+  const url = new URL(`${BASE_URL}${normalizedEndpoint}`);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
