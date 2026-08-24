@@ -239,8 +239,8 @@ export const UploadPage: React.FC = () => {
             return item;
           })
         );
-      } catch (e) {
-        console.warn('Status poll warning:', e);
+      } catch {
+        // Silently skip transient network fluctuations during background polling
       } finally {
         isPollingRef.current = false;
       }

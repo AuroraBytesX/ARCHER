@@ -16,6 +16,21 @@ const BASE_URL =
   ((import.meta as any).env && (import.meta as any).env.VITE_API_URL) ||
   (import.meta.env.DEV ? '/api' : 'https://archer-2h04.onrender.com/api');
 
+function buildUrl(endpoint: string, params?: Record<string, string | number | undefined>): string {
+  const isAbsolute = BASE_URL.startsWith('http://') || BASE_URL.startsWith('https://');
+  const base = isAbsolute ? BASE_URL : `${window.location.origin}${BASE_URL}`;
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = new URL(`${base}${normalizedEndpoint}`);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.append(key, String(value));
+      }
+    });
+  }
+  return url.toString();
+}
+
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...(extra || {}) };
   const email = localStorage.getItem('archer_email');
@@ -104,15 +119,15 @@ export const api = {
     page?: number;
     limit?: number;
   }): Promise<DocumentListResponse> {
-    const url = new URL(`${window.location.origin}${BASE_URL}/documents`);
-    if (params?.search) url.searchParams.append('search', params.search);
-    if (params?.status) url.searchParams.append('status', params.status);
-    if (params?.collection_id) url.searchParams.append('collection_id', params.collection_id);
-    if (params?.year) url.searchParams.append('year', params.year.toString());
-    if (params?.page) url.searchParams.append('page', params.page.toString());
-    if (params?.limit) url.searchParams.append('limit', params.limit.toString());
-
-    const res = await fetch(url.toString().replace(window.location.origin, ''), {
+    const url = buildUrl('/documents', {
+      search: params?.search,
+      status: params?.status,
+      collection_id: params?.collection_id,
+      year: params?.year,
+      page: params?.page,
+      limit: params?.limit,
+    });
+    const res = await fetch(url, {
       headers: getHeaders(),
     });
     return handleResponse<DocumentListResponse>(res);
@@ -194,19 +209,17 @@ export const api = {
     page?: number;
     limit?: number;
   }): Promise<SearchResponse> {
-    const url = new URL(`${window.location.origin}${BASE_URL}/search`);
-    url.searchParams.append('q', params.q);
-    if (params.mode) url.searchParams.append('mode', params.mode);
-    if (params.collection_id) url.searchParams.append('collection_id', params.collection_id);
-    if (params.document_ids && params.document_ids.length > 0) {
-      url.searchParams.append('document_ids', params.document_ids.join(','));
-    }
-    if (params.year_min) url.searchParams.append('year_min', params.year_min.toString());
-    if (params.year_max) url.searchParams.append('year_max', params.year_max.toString());
-    if (params.page) url.searchParams.append('page', params.page.toString());
-    if (params.limit) url.searchParams.append('limit', params.limit.toString());
-
-    const res = await fetch(url.toString().replace(window.location.origin, ''), {
+    const url = buildUrl('/search', {
+      q: params.q,
+      mode: params.mode,
+      collection_id: params.collection_id,
+      document_ids: params.document_ids && params.document_ids.length > 0 ? params.document_ids.join(',') : undefined,
+      year_min: params.year_min,
+      year_max: params.year_max,
+      page: params.page,
+      limit: params.limit,
+    });
+    const res = await fetch(url, {
       headers: getHeaders(),
     });
     return handleResponse<SearchResponse>(res);
@@ -293,21 +306,19 @@ export const api = {
 
   // Insights
   async getInsights(collection_id?: string): Promise<InsightsResponse> {
-    const url = new URL(`${window.location.origin}${BASE_URL}/insights`);
-    if (collection_id) url.searchParams.append('collection_id', collection_id);
-    const res = await fetch(url.toString().replace(window.location.origin, ''), {
+    const url = buildUrl('/insights', { collection_id });
+    const res = await fetch(url, {
       headers: getHeaders(),
     });
     return handleResponse<InsightsResponse>(res);
   },
 
   async getResearchGaps(collection_id?: string, document_ids?: string[]): Promise<ResearchGapItem[]> {
-    const url = new URL(`${window.location.origin}${BASE_URL}/insights/gaps`);
-    if (collection_id) url.searchParams.append('collection_id', collection_id);
-    if (document_ids && document_ids.length > 0) {
-      url.searchParams.append('document_ids', document_ids.join(','));
-    }
-    const res = await fetch(url.toString().replace(window.location.origin, ''), {
+    const url = buildUrl('/insights/gaps', {
+      collection_id,
+      document_ids: document_ids && document_ids.length > 0 ? document_ids.join(',') : undefined,
+    });
+    const res = await fetch(url, {
       headers: getHeaders(),
     });
     return handleResponse<ResearchGapItem[]>(res);
