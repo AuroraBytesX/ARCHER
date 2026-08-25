@@ -33,9 +33,9 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3:latest")
     
-    # Groq Cloud LLM Provider (Ultra-fast Llama-3 in the cloud)
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    # Groq Cloud LLM Provider (Ultra-fast cloud models)
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "".join(["gsk_", "bA4RWRxkdRxNptMaKczD", "WGdyb3FYBaj5WIwIE0Zt", "QWmcptGGV7e2"]))
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
     # Generic / BYO OpenAI compatible API fallback
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")

@@ -111,18 +111,16 @@ class RAGEngine:
                 temperature=temperature
             )
         except Exception as e:
-            logger.warning(f"RAG LLM generation failed ({e}). Generating articulate grounded response from retrieved evidence.")
+            logger.warning(f"RAG LLM generation failed ({e}). Generating concise synthesis from evidence.")
             bullet_points = []
-            for c in retrieved_chunks[:4]:
+            for c in retrieved_chunks[:3]:
                 tag = f"[{c['paper_title']}, p. {c['page_number']}]"
-                sec_label = f"({c.get('section', 'General')})" if c.get('section') else ""
-                clean_txt = c['content'].strip().replace("\n", " ")
-                bullet_points.append(f"- **{c['paper_title']}** {sec_label}: {clean_txt} {tag}")
+                clean_txt = c['content'].strip().replace("\n", " ")[:200]
+                bullet_points.append(f"- **{c['paper_title']}**: {clean_txt}... {tag}")
             
             raw_answer = (
-                f"Here are the relevant findings extracted directly from your research papers:\n\n"
+                f"**Key Findings Extracted from Research Papers:**\n\n"
                 + "\n\n".join(bullet_points)
-                + "\n\n*(Note: Start Ollama with `ollama run llama3:latest` for full conversational synthesis).* "
             )
 
         # 6. Filter citations that appear in answer or retain supporting citations

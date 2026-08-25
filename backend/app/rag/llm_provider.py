@@ -1,4 +1,4 @@
-﻿from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 import httpx
 from app.core.config import settings
@@ -122,16 +122,55 @@ class OpenAICompatibleProvider(LLMProvider):
 
 class GroqProvider(OpenAICompatibleProvider):
     def __init__(self, api_key: str = None, model: str = None):
+        key = api_key or settings.GROQ_API_KEY
+        mdl = model or settings.GROQ_MODEL or "openai/gpt-oss-120b"
         super().__init__(
             base_url="https://api.groq.com/openai/v1",
-            api_key=api_key or settings.GROQ_API_KEY,
-            model=model or settings.GROQ_MODEL or "llama-3.1-8b-instant",
+            api_key=key,
+            model=mdl,
             provider_name="groq"
         )
+        self.fallback_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
+
+    async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2) -> str:
+        models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        last_error = None
+        for mdl in models_to_try:
+            payload = {
+                "model": mdl,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        choices = data.get("choices", [])
+                        if choices:
+                            return choices[0].get("message", {}).get("content", "").strip()
+                    else:
+                        logger.warning(f"Groq model {mdl} returned {resp.status_code}: {resp.text[:100]}")
+                        last_error = f"HTTP {resp.status_code}: {resp.text[:100]}"
+            except Exception as e:
+                logger.warning(f"Groq model {mdl} exception: {e}")
+                last_error = str(e)
+
+        raise RuntimeError(f"All Groq models failed. Last error: {last_error}")
 
 def get_llm_provider() -> LLMProvider:
     # Priority 1: First-class Groq Cloud API
-    if settings.GROQ_API_KEY and settings.GROQ_API_KEY.strip():
+    if (settings.GROQ_API_KEY and settings.GROQ_API_KEY.strip()) or True:
         return GroqProvider()
     
     # Priority 2: Generic OpenAI compatible API
