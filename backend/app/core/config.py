@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     
     # Groq Cloud LLM Provider (Ultra-fast Llama-3 in the cloud)
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "groq/compound-mini")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
     # Generic / BYO OpenAI compatible API fallback
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")
