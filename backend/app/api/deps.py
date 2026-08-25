@@ -1,4 +1,4 @@
-﻿import time
+import time
 from typing import Optional, Dict, List
 from fastapi import Header, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -12,13 +12,34 @@ _request_history: Dict[str, List[float]] = {}
 
 def rate_limiter(request: Request):
     """
-    Enforces a strict 40 requests per minute rate limit across all expensive endpoints.
-    Tracks client by IP address or authentication token.
+    Enforces rate limit across endpoints.
+    Properly extracts real client IP behind reverse proxies (Render/Cloudflare/Vercel)
+    using X-Forwarded-For, X-User-Email, or Authorization.
     """
-    client_key = request.client.host if request.client else "unknown"
-    auth_header = request.headers.get("Authorization")
-    if auth_header:
-        client_key = auth_header
+    client_key = None
+    
+    # 1. User email header (if authenticated or guest session email)
+    user_email = request.headers.get("X-User-Email")
+    if user_email and user_email.strip():
+        client_key = user_email.strip().lower()
+    
+    # 2. Authorization header
+    if not client_key:
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            client_key = auth_header.strip()
+            
+    # 3. Real client IP from proxy headers
+    if not client_key:
+        x_forwarded_for = request.headers.get("X-Forwarded-For")
+        if x_forwarded_for:
+            client_key = x_forwarded_for.split(",")[0].strip()
+        elif request.headers.get("CF-Connecting-IP"):
+            client_key = request.headers.get("CF-Connecting-IP")
+        elif request.client:
+            client_key = request.client.host
+        else:
+            client_key = "default_client"
 
     current_time = time.time()
     if client_key not in _request_history:

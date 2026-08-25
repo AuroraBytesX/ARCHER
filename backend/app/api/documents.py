@@ -56,11 +56,22 @@ router = APIRouter()
 def get_upload_directory() -> str:
     """
     Always resolve the configured upload directory to an
-    absolute physical directory.
+    absolute physical directory with automatic /tmp fallback on cloud containers.
     """
-    upload_dir = os.path.abspath(settings.UPLOAD_DIR)
-    os.makedirs(upload_dir, exist_ok=True)
-    return upload_dir
+    try:
+        upload_dir = os.path.abspath(settings.UPLOAD_DIR)
+        os.makedirs(upload_dir, exist_ok=True)
+        test_file = os.path.join(upload_dir, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        if os.path.exists(test_file):
+            os.remove(test_file)
+        return upload_dir
+    except Exception as e:
+        logger.warning(f"[UPLOAD] Standard upload_dir ({settings.UPLOAD_DIR}) inaccessible: {e}. Falling back to system temp.")
+        fallback_dir = os.path.join(tempfile.gettempdir(), "archer_uploads")
+        os.makedirs(fallback_dir, exist_ok=True)
+        return fallback_dir
 
 
 def resolve_document_path(file_path: Optional[str]) -> Optional[str]:
