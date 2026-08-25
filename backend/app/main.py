@@ -13,19 +13,7 @@ from app.api.router import api_router
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
     init_db()
-    
-    # Non-blocking async background warmup so port binds in <0.5 seconds
-    import threading
-    def _warmup():
-        try:
-            from app.services.embedding_service import get_embedding_provider
-            provider = get_embedding_provider()
-            provider.embed_query("warmup query")
-            logger.info("Embedding provider pre-warmed successfully in background.")
-        except Exception as e:
-            logger.warning(f"Embedding warmup note: {e}")
-
-    threading.Thread(target=_warmup, daemon=True).start()
+    logger.info("ARCHER backend initialized and accepting connections.")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 
