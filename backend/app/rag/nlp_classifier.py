@@ -11,7 +11,7 @@ CASUAL_PATTERNS = [
     r"^(how are you|how are you doing|how's it going|how are things)\b",
     r"^(who are you|what are you|what is your name|what can you do|how do you work|help me|help)\b",
     r"^(good morning|good afternoon|good evening|good day)\b",
-    r"^(thanks|thank you|thanks a lot|thx|ok|okay|cool|nice|great|got it|sure)\b",
+    r"^(thanks|thank you|thanks a lot|thx|thankyou|hank you|ok|okay|cool|nice|great|got it|sure)\b",
     r"^(bye|goodbye|see you|cya)\b"
 ]
 

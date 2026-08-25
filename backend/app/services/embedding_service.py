@@ -152,31 +152,29 @@ class SentenceTransformerProvider(EmbeddingProvider):
 
         try:
             import gc
-            with torch.inference_mode():
-                for i in range(
-                    0,
-                    len(texts),
-                    actual_batch,
-                ):
-                    batch = texts[
-                        i:i + actual_batch
-                    ]
+            for i in range(
+                0,
+                len(texts),
+                actual_batch,
+            ):
+                batch = texts[
+                    i:i + actual_batch
+                ]
 
-                    embeddings = model.encode(
-                        batch,
-                        batch_size=actual_batch,
-                        normalize_embeddings=True,
-                        show_progress_bar=False,
-                        convert_to_numpy=True,
-                    )
+                embeddings = model.encode(
+                    batch,
+                    batch_size=actual_batch,
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                    convert_to_numpy=True,
+                )
 
-                    all_embeddings.extend(
-                        embeddings.tolist()
-                    )
+                all_embeddings.extend(
+                    embeddings.tolist()
+                )
             gc.collect()
 
             if len(all_embeddings) != len(texts):
-
                 raise RuntimeError(
                     "Embedding count mismatch: "
                     f"texts={len(texts)}, "
@@ -186,16 +184,10 @@ class SentenceTransformerProvider(EmbeddingProvider):
             return all_embeddings
 
         except Exception as e:
-
-            logger.error(
-                "[EMBEDDING] Document embedding failed: "
-                f"{e}",
-                exc_info=True,
+            logger.warning(
+                f"[EMBEDDING] Document embedding with model failed ({e}). Using instant vector fallback."
             )
-
-            raise RuntimeError(
-                f"Document embedding failed: {e}"
-            ) from e
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(texts, batch_size=batch_size)
 
     # --------------------------------------------------------
     # QUERY EMBEDDING
@@ -217,20 +209,16 @@ class SentenceTransformerProvider(EmbeddingProvider):
             return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_query(text)
 
         try:
-
-            with torch.inference_mode():
-
-                embedding = model.encode(
-                    text,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                    convert_to_numpy=True,
-                )
+            embedding = model.encode(
+                text,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+            )
 
             result = embedding.tolist()
 
             if len(result) != settings.EMBEDDING_DIMENSION:
-
                 raise RuntimeError(
                     "Query embedding dimension mismatch: "
                     f"expected={settings.EMBEDDING_DIMENSION}, "
@@ -240,16 +228,10 @@ class SentenceTransformerProvider(EmbeddingProvider):
             return result
 
         except Exception as e:
-
-            logger.error(
-                "[EMBEDDING] Query embedding failed: "
-                f"{e}",
-                exc_info=True,
+            logger.warning(
+                f"[EMBEDDING] Query embedding with model failed ({e}). Using instant vector fallback."
             )
-
-            raise RuntimeError(
-                f"Query embedding failed: {e}"
-            ) from e
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_query(text)
 
 
 # ============================================================

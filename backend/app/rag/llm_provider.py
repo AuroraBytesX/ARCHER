@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
+import re
 import httpx
 from app.core.config import settings
 from app.core.logging import logger
@@ -134,10 +135,10 @@ class GroqProvider(OpenAICompatibleProvider):
             model=mdl,
             provider_name="groq"
         )
-        self.fallback_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
+        self.fallback_models = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
 
     async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2) -> str:
-        models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
+        models_to_try = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
         if self.model and self.model not in models_to_try and not self.model.startswith("llama-3"):
             models_to_try.insert(0, self.model)
         
@@ -173,15 +174,11 @@ class GroqProvider(OpenAICompatibleProvider):
                                 if content:
                                     # Strip internal thinking tokens
                                     content = re.sub(r"<think>[\s\S]*?</think>", "", content).strip()
-                                    # Sanitize unicode special spaces & symbols
-                                    content = (
-                                        content.replace("\u202f", " ")
-                                        .replace("\u2009", " ")
-                                        .replace("\u200b", "")
-                                        .replace("\u2013", "-")
-                                        .replace("\u2014", "-")
-                                        .replace("\u2212", "-")
-                                    )
+                                    # Sanitize all unicode hyphens, dashes, and spaces
+                                    for h in ["\u2010", "\u2011", "\u2012", "\u2013", "\u2014", "\u2015", "\u2212"]:
+                                        content = content.replace(h, "-")
+                                    for s in ["\u202f", "\u2009", "\u200a", "\u200b", "\u00a0", "\u3000"]:
+                                        content = content.replace(s, " ")
                                     return content
                         else:
                             logger.warning(f"Groq {mdl} status {resp.status_code}: {resp.text[:120]}")

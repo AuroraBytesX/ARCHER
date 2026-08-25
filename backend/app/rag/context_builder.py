@@ -34,13 +34,16 @@ class ContextBuilder:
         citations_lookup: List[CitationItem] = []
 
         scores = []
-        for idx, chunk in enumerate(retrieved_chunks):
+        # Use top 4 most relevant chunks to maintain fast token budget
+        for idx, chunk in enumerate(retrieved_chunks[:4]):
             doc_id = chunk["document_id"]
             title = chunk["paper_title"]
             page = chunk["page_number"]
             cid = chunk["chunk_id"]
             sec = chunk.get("section", "General")
             content = chunk["content"].strip()
+            # Trim content to 450 chars max
+            content_trimmed = content[:450] + ("..." if len(content) > 450 else "")
             score = chunk.get("score", 0.5)
             scores.append(score)
 
@@ -51,7 +54,7 @@ class ContextBuilder:
                 f"Source: {title}\n"
                 f"Page: {page} | Section: {sec}\n"
                 f"Reference Tag: {citation_label}\n"
-                f"Content:\n{content}\n"
+                f"Content:\n{content_trimmed}\n"
             )
 
             citations_lookup.append(CitationItem(
@@ -60,7 +63,7 @@ class ContextBuilder:
                 page_number=page,
                 chunk_id=cid,
                 section=sec,
-                quote=content[:250] + ("..." if len(content) > 250 else ""),
+                quote=content[:200] + ("..." if len(content) > 200 else ""),
                 citation_label=citation_label
             ))
 
@@ -73,9 +76,10 @@ class ContextBuilder:
         history_section = ""
         if conversation_history:
             history_blocks = []
-            for msg in conversation_history[-4:]:  # last 4 turns
+            for msg in conversation_history[-2:]:  # last 2 turns
                 role = "User" if msg["role"] == "user" else "Assistant"
-                history_blocks.append(f"{role}: {msg['content']}")
+                content_short = msg['content'][:250] + ("..." if len(msg['content']) > 250 else "")
+                history_blocks.append(f"{role}: {content_short}")
             history_section = "CONVERSATION HISTORY (FOR CONTINUITY):\n" + "\n".join(history_blocks) + "\n\n"
 
         prompt = (
@@ -84,7 +88,7 @@ class ContextBuilder:
             f"{context_str}\n\n"
             f"CURRENT USER RESEARCH QUESTION:\n"
             f"{query}\n\n"
-            f"Provide a rigorous, comprehensive, citation-grounded response citing each claim with [Paper Title, p. <page_number>]."
+            f"Provide a natural, clear, citation-grounded answer. Cite each key claim using [Paper Title, p. <page_number>]."
         )
 
         return prompt, citations_lookup, evidence_score
