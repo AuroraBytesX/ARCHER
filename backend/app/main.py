@@ -55,17 +55,26 @@ app = FastAPI(
 # CORS middleware (permits all Vercel domains, preview branches, Render and local hosts)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "https://archer-research-nine.vercel.app",
+    ],
     allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include API Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
+@app.head("/")
 def root():
     return {
         "service": settings.PROJECT_NAME,
