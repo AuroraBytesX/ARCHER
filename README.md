@@ -53,10 +53,13 @@ ARCHER solves these challenges through an open-source hybrid retrieval-augmented
   - **Guest Access**: Per-session access limited to 40 requests. Guests explore public sample papers; inquiry state is scoped per session and resets on page refresh.
 
 - **Production Cloud and Local Providers**:
-  - **Cloud LLM (Fast & Free)**: First-class integration with Groq (`llama-3.3-70b-versatile` / `compound-mini`) delivering 500 tokens/second at zero cost without rate-limit bottlenecks.
-  - **Embedding Acceleration (FastEmbed ONNX & BAAI/bge-small-en-v1.5)**: FastEmbed ONNX runtime (~35MB RAM footprint) with BAAI/bge-small-en-v1.5 384-dimensional cosine embeddings, perfectly optimized for 512MB cloud free tiers and local CPU.
-  - **Email Dispatch**: Native Resend Cloud API support with Gmail SMTP fallback for password recovery and developer contact messages.
-  - **Database**: Serverless PostgreSQL with direct compute connection and native `pgvector` on Neon.
+  - **Cloud LLM (High-Speed & Free)**: Integration with Groq Cloud API featuring `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, and `qwen/qwen3.6-27b` with automated multi-model failover, delivering 500+ tokens/second with sub-second response times.
+  - **Dynamic Token Budget & Context Windowing**: Top-4 slotted chunk windowing with character constraints, guaranteeing high citation accuracy while preventing 413 token overflow errors.
+  - **Interactive Markdown & Table UI Renderer**: Custom `MarkdownRenderer` component supporting styled, responsive comparison tables, process diagrams (`Step 1 -> Step 2 -> Step 3`), bullet points, and client-side reasoning token filtering.
+  - **Auto-Renewing 500-Query Quota**: Automatic quota replenishment on every login for authenticated users.
+  - **Embedding Acceleration (FastEmbed ONNX & SentenceTransformers)**: 384-dimensional vector embeddings with instant NumPy vector fallback, optimized for cloud 512MB RAM tiers.
+  - **Email Dispatch**: Native Resend Cloud API support with Gmail SMTP fallback for password recovery and OTP verification.
+  - **Database**: Serverless PostgreSQL with native `pgvector` on Neon for cosine similarity indexing.
   - **Mobile-Responsive UI**: Fluid layouts with automatic filename truncation and dedicated touch navigation drawers.
 
 ---
@@ -65,22 +68,22 @@ ARCHER solves these challenges through an open-source hybrid retrieval-augmented
 
 ```
 +-------------------------------------------------------------+
-|                     React 18 + Vite UI                      |
-| (Dashboard, Ingestion, Chat, Comparison, Executive Insights)|
+|               React 18 + Vite + TypeScript UI               |
+| (Dashboard, Ingestion, Markdown Tables, Comparison, Chat)   |
 +-------------------------------------------------------------+
                                |
-                               | HTTPS / JSON (Bearer Auth + Rate Limit)
+                               | HTTPS / JSON (Bearer Auth + Auto-Renew Quota)
                                v
 +-------------------------------------------------------------+
 |                   FastAPI Backend Engine                    |
-| (REST Endpoints, Ingestion Queue, Hybrid RAG Pipeline)      |
+| (REST Endpoints, NLP Intent Router, Hybrid RAG Pipeline)    |
 +-------------------------------------------------------------+
                  |                           |
                  v                           v
 +---------------------------------+  +-------------------------------+
 |       Embedding Engine          |  |       Cloud LLM Provider      |
-|  SentenceTransformers (384 dim) |  |  Groq Cloud (Llama-3/Compound)|
-|  (Local CPU or Render Server)   |  |  (or Local Ollama Fallback)   |
+|  SentenceTransformers (384 dim) |  |  Groq Cloud (gpt-oss-20b/120b)|
+|  + Instant Fallback Provider    |  |  + Multi-Model Failover Chain |
 +---------------------------------+  +-------------------------------+
                  |
                  v
