@@ -298,7 +298,6 @@ def process_pdf_background(document_id: str, file_path: str):
 @router.post(
     "/documents/upload",
     response_model=List[DocumentResponse],
-    dependencies=[Depends(rate_limiter)],
 )
 async def upload_documents(
     background_tasks: BackgroundTasks,
