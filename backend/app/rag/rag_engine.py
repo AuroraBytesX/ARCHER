@@ -39,7 +39,7 @@ class RAGEngine:
 
         # 1. NLP Query Intent Classification
         intent_type, intent_message = classify_query_intent(trimmed_query)
-        if intent_type in ["GREETING", "POLITENESS", "CAPABILITY", "GIBBERISH"]:
+        if intent_type in ["GREETING", "POLITENESS", "CAPABILITY", "GIBBERISH", "OFF_TOPIC"]:
             conv_id, msg_id = self._save_conversation(conversation_id, trimmed_query, intent_message, [])
             return ChatResponse(
                 conversation_id=conv_id,

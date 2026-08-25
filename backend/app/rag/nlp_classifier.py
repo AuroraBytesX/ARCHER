@@ -1,4 +1,4 @@
-﻿import re
+import re
 from typing import Tuple
 
 GIBBERISH_PATTERNS = [
@@ -46,11 +46,18 @@ def is_gibberish_or_repeated(text: str) -> bool:
 
     return False
 
+OFF_TOPIC_PATTERNS = [
+    r"\b(cake|pizza|cookie|burger|food|recipe|bake|cook|coffee|tea|lunch|dinner|breakfast|snack|chocolate|dessert)\b",
+    r"\b(joke|funny|riddle|story|poem|song|sing|dance|movie|music|game|gaming|play)\b",
+    r"\b(weather|temperature|forecast|rain|sunny|climate today|clothes|fashion)\b",
+    r"\b(buy|sell|price of|crypto|bitcoin|stock price|shop|shopping)\b",
+]
+
 def classify_query_intent(text: str) -> Tuple[str, str]:
     """
     NLP Intent Classifier:
     Returns (intent_type, message)
-    intent_type: 'GIBBERISH' | 'GREETING' | 'POLITENESS' | 'CAPABILITY' | 'RESEARCH_QUERY'
+    intent_type: 'GIBBERISH' | 'GREETING' | 'POLITENESS' | 'CAPABILITY' | 'OFF_TOPIC' | 'RESEARCH_QUERY'
     """
     cleaned = text.strip().lower()
     normalized = re.sub(r"[^\w\s]", " ", cleaned).strip()
@@ -63,10 +70,20 @@ def classify_query_intent(text: str) -> Tuple[str, str]:
             "architectural choices, datasets, empirical benchmarks, or reported limitations."
         )
 
+    # Check for off-topic everyday inquiries (recipes, food, jokes, entertainment)
+    has_research_kw = any(kw in normalized for kw in RESEARCH_KEYWORDS)
+    if not has_research_kw:
+        for pat in OFF_TOPIC_PATTERNS:
+            if re.search(pat, cleaned) or re.search(pat, normalized):
+                return "OFF_TOPIC", (
+                    "I am an academic research assistant dedicated strictly to analyzing scientific literature in your library. "
+                    "I focus on methodologies, neural architectures, empirical benchmarks, and mathematical formulations from your research papers. "
+                    "Please ask a question related to your uploaded research documents."
+                )
+
     # Check for simple pleasantries
     for pat in CASUAL_PATTERNS:
         if re.search(pat, cleaned) or re.search(pat, normalized):
-            has_research_kw = any(kw in normalized for kw in RESEARCH_KEYWORDS)
             if not has_research_kw or len(words) <= 5:
                 if any(w in normalized for w in ["who are you", "what can you do", "what are you", "help"]):
                     return "CAPABILITY", (
