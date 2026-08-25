@@ -411,26 +411,29 @@ class MockFallbackEmbeddingProvider(EmbeddingProvider):
 def get_embedding_provider() -> EmbeddingProvider:
     provider = settings.EMBEDDING_PROVIDER.strip().lower()
 
+    if provider in ["mock", "fast", "instant"]:
+        return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+
+    if provider in ["cloud", "huggingface", "api"]:
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+        if hf_token:
+            logger.info("[EMBEDDING] Provider: Cloud API (Zero RAM)")
+            return CloudAPIEmbeddingProvider(api_key=hf_token)
+        else:
+            logger.info("[EMBEDDING] Provider: Instant Zero-Lag Vector Engine")
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+
     if provider in ["fastembed", "onnx"]:
         logger.info("[EMBEDDING] Provider: FastEmbed ONNX (Low RAM)")
         return FastEmbedProvider()
 
-    if provider in ["cloud", "huggingface", "api"]:
-        logger.info("[EMBEDDING] Provider: Cloud API (Zero RAM)")
-        return CloudAPIEmbeddingProvider()
-
     if provider == "sentence_transformers":
-        # Check if fastembed is available for low-memory environments
         try:
             import fastembed
-            logger.info("[EMBEDDING] FastEmbed detected on system, using memory-efficient ONNX runtime (~35MB RAM).")
             return FastEmbedProvider()
         except ImportError:
-            logger.info("[EMBEDDING] Provider: SentenceTransformer (CPU)")
             return SentenceTransformerProvider()
 
-    if provider == "mock":
-        logger.warning("[EMBEDDING] Using MOCK embedding provider.")
-        return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
+    return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
 
     raise ValueError(f"Unsupported embedding provider: {settings.EMBEDDING_PROVIDER}")
