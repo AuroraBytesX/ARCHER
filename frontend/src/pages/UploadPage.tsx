@@ -221,12 +221,34 @@ export const UploadPage: React.FC = () => {
     pollProcessingStatuses();
   };
 
+  const pollCountRef = useRef(0);
+
   const pollProcessingStatuses = () => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
+    pollCountRef.current = 0;
 
     pollTimerRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+
+      // Stop after 25 polls (75 seconds)
+      if (pollCountRef.current > 25) {
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+        setItems((prev) =>
+          prev.map((i) =>
+            i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING' || i.status === 'UPLOADING'
+              ? { ...i, status: 'FAILED', error: 'Indexing timed out. Please retry.' }
+              : i
+          )
+        );
+        return;
+      }
+
       const activeItems = itemsRef.current.filter(
         (i) => i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING' || i.status === 'UPLOADING'
       );
@@ -236,7 +258,10 @@ export const UploadPage: React.FC = () => {
       ) as string[];
 
       if (activeDocIds.length === 0) {
-        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
         return;
       }
 
@@ -244,7 +269,6 @@ export const UploadPage: React.FC = () => {
 
       try {
         isPollingRef.current = true;
-        // Targeted single-document status requests — ZERO full library queries
         const statusResults = await Promise.allSettled(
           activeDocIds.map((id) => api.getDocumentStatus(id))
         );
