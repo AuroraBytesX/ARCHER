@@ -6,57 +6,61 @@ from app.db.session import get_db
 from app.models.user import User
 from app.core.logging import logger
 
-RATE_LIMIT_WINDOW = 60.0
-MAX_REQUESTS_PER_WINDOW = 240
-_request_history: Dict[str, List[float]] = {}
+QUERY_RATE_LIMIT_WINDOW = 60.0
+GUEST_MAX_QUERIES = 40
+REGISTERED_MAX_QUERIES = 500
+_query_history: Dict[str, List[float]] = {}
 
-def rate_limiter(request: Request):
+def query_rate_limiter(
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
     """
-    Enforces rate limit across endpoints.
-    Properly extracts real client IP behind reverse proxies (Render/Cloudflare/Vercel)
-    using X-Forwarded-For, X-User-Email, or Authorization.
+    Enforces AI inquiry rate limits:
+    - Guest users: 40 queries per minute
+    - Registered accounts: 500 queries quota
+    Only applied to AI inference/chat endpoints (/api/chat, /api/compare, etc.).
+    Never throttles document status polling, file uploads, or dashboard navigation.
     """
-    client_key = None
-    
-    # 1. User email header (if authenticated or guest session email)
-    user_email = request.headers.get("X-User-Email")
-    if user_email and user_email.strip():
-        client_key = user_email.strip().lower()
-    
-    # 2. Authorization header
-    if not client_key:
-        auth_header = request.headers.get("Authorization")
-        if auth_header:
-            client_key = auth_header.strip()
-            
-    # 3. Real client IP from proxy headers
-    if not client_key:
-        x_forwarded_for = request.headers.get("X-Forwarded-For")
-        if x_forwarded_for:
-            client_key = x_forwarded_for.split(",")[0].strip()
-        elif request.headers.get("CF-Connecting-IP"):
-            client_key = request.headers.get("CF-Connecting-IP")
-        elif request.client:
-            client_key = request.client.host
+    # Identify client
+    if current_user:
+        client_key = f"user_{current_user.id}"
+        max_queries = REGISTERED_MAX_QUERIES
+    else:
+        user_email = request.headers.get("X-User-Email")
+        if user_email and user_email.strip():
+            client_key = f"guest_{user_email.strip().lower()}"
         else:
-            client_key = "default_client"
+            x_forwarded_for = request.headers.get("X-Forwarded-For")
+            if x_forwarded_for:
+                client_key = f"ip_{x_forwarded_for.split(',')[0].strip()}"
+            elif request.client:
+                client_key = f"ip_{request.client.host}"
+            else:
+                client_key = "guest_default"
+        max_queries = GUEST_MAX_QUERIES
 
     current_time = time.time()
-    if client_key not in _request_history:
-        _request_history[client_key] = []
+    if client_key not in _query_history:
+        _query_history[client_key] = []
 
-    _request_history[client_key] = [
-        t for t in _request_history[client_key] if current_time - t < RATE_LIMIT_WINDOW
+    # Filter out entries older than the window
+    _query_history[client_key] = [
+        t for t in _query_history[client_key] if current_time - t < QUERY_RATE_LIMIT_WINDOW
     ]
 
-    if len(_request_history[client_key]) >= MAX_REQUESTS_PER_WINDOW:
-        logger.warning(f"Rate limit exceeded for client {client_key}")
+    if len(_query_history[client_key]) >= max_queries:
+        logger.warning(f"Query rate limit exceeded for client {client_key} ({len(_query_history[client_key])}/{max_queries})")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. ARCHER allows up to 40 requests per minute. Please try again shortly."
+            detail=f"Query limit reached ({max_queries} queries/minute). " + 
+                   ("Please wait a moment before sending your next inquiry." if current_user else "Sign in to upgrade to 500 queries.")
         )
 
-    _request_history[client_key].append(current_time)
+    _query_history[client_key].append(current_time)
+
+# Backward-compatibility alias
+rate_limiter = query_rate_limiter
 
 
 def get_current_user_optional(

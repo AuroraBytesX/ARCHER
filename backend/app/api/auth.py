@@ -24,7 +24,7 @@ router = APIRouter()
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-@router.post("/auth/register", response_model=AuthResponse, dependencies=[Depends(rate_limiter)])
+@router.post("/auth/register", response_model=AuthResponse)
 def register_user(payload: UserRegisterRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.lower().strip()
     if not email_clean or "@" not in email_clean:
@@ -63,7 +63,7 @@ def register_user(payload: UserRegisterRequest, db: Session = Depends(get_db)):
         message="Account created successfully."
     )
 
-@router.post("/auth/login", response_model=AuthResponse, dependencies=[Depends(rate_limiter)])
+@router.post("/auth/login", response_model=AuthResponse)
 def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email_clean).first()
@@ -82,7 +82,7 @@ def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
         message="Sign in successful."
     )
 
-@router.post("/auth/forgot-password", response_model=ForgotPasswordResponse, dependencies=[Depends(rate_limiter)])
+@router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email_clean).first()
@@ -123,7 +123,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         message=f"A 6-digit recovery code has been dispatched to {email_clean}."
     )
 
-@router.post("/auth/reset-password", response_model=ResetPasswordResponse, dependencies=[Depends(rate_limiter)])
+@router.post("/auth/reset-password", response_model=ResetPasswordResponse)
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email_clean).first()

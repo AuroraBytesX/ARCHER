@@ -700,7 +700,6 @@ def get_document_status(
 @router.post(
     "/documents/upload-zip",
     response_model=BatchUploadResponse,
-    dependencies=[Depends(rate_limiter)],
 )
 async def upload_zip_documents(
     background_tasks: BackgroundTasks,
