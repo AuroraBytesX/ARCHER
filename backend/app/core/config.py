@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
 
-    # Embedding Provider
-    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "fastembed")
+    # Embedding Provider (Cloud API = 0MB RAM, zero file downloads, instant responses)
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "cloud")
     EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-en-v1.5")
     EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
     EMBEDDING_DIMENSION: int = 384

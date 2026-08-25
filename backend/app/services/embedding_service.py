@@ -349,7 +349,7 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
         for i in range(0, len(texts), actual_batch):
             chunk_batch = texts[i:i + actual_batch]
             try:
-                with httpx.Client(timeout=30.0) as client:
+                with httpx.Client(timeout=5.0) as client:
                     resp = client.post(self.api_url, json={"inputs": chunk_batch}, headers=headers)
                     if resp.status_code == 200:
                         all_embeddings.extend(resp.json())
@@ -358,7 +358,7 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
                         fallback_emb = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(chunk_batch)
                         all_embeddings.extend(fallback_emb)
             except Exception as e:
-                logger.warning(f"[EMBEDDING] Cloud API connection note: {e}. Using deterministic fallback.")
+                logger.warning(f"[EMBEDDING] Cloud API note: {e}. Using deterministic fallback.")
                 fallback_emb = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(chunk_batch)
                 all_embeddings.extend(fallback_emb)
         return all_embeddings
@@ -371,7 +371,7 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         try:
-            with httpx.Client(timeout=15.0) as client:
+            with httpx.Client(timeout=5.0) as client:
                 resp = client.post(self.api_url, json={"inputs": [text]}, headers=headers)
                 if resp.status_code == 200:
                     data = resp.json()
