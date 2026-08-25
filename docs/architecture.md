@@ -37,9 +37,9 @@ ARCHER (**AI-Powered, Citation-Grounded Hybrid Extraction and Retrieval System f
         │                           │                           │
         ▼                           ▼                           ▼
 ┌──────────────┐            ┌──────────────┐            ┌──────────────┐
-│ Sentence-    │            │ Chunks &     │            │ Ollama / LLM │
-│ Transformers │───────────►│ Embeddings   │───────────►│ Grounded RAG │
-│ MiniLM-L6-v2 │            │ (384-dim)    │            │ Engine       │
+│ Sentence-    │            │ Chunks &     │            │ Groq Cloud   │
+│ Transformers │───────────►│ Embeddings   │───────────►│ (gpt-oss-20b)│
+│ MiniLM-L6-v2 │            │ (384-dim)    │            │ Grounded RAG │
 └──────────────┘            └──────────────┘            └──────────────┘
 ```
 

@@ -4,9 +4,25 @@ The FastAPI backend exposes the following typed REST endpoints under `/api`.
 
 ---
 
-## 1. Health & Status
+## 1. Authentication & User Quota (`/api/auth`)
+- `POST /api/auth/register`
+  - Registers a new user account with hashed password and initial 500-query library quota.
+- `POST /api/auth/login`
+  - Authenticates user, issues JWT bearer token, and automatically replenishes the 500-query quota.
+- `GET /api/auth/me`
+  - Returns authenticated user profile, active quota balance, and library statistics.
+- `POST /api/auth/forgot-password`
+  - Sends 6-digit OTP verification email via Resend Cloud.
+- `POST /api/auth/reset-password`
+  - Verifies OTP and resets user password.
+- `POST /api/contact`
+  - Dispatches contact inquiries directly to `tapashidhar2004@gmail.com`.
+
+---
+
+## 2. Health & Status
 - `GET /api/health`
-  - Returns service status, database connectivity, embedding model, and Ollama LLM health.
+  - Returns service status, database connectivity, embedding model, and Groq LLM health.
 
 ---
 
