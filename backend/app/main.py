@@ -35,7 +35,7 @@ app.add_middleware(
         "http://localhost:8000",
         "https://archer-research-nine.vercel.app",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+|http://127\.0\.0\.1:\d+",
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
