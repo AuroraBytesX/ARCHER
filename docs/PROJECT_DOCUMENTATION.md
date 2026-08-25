@@ -1,4 +1,4 @@
-﻿# ARCHER: Comprehensive Technical and Architectural Documentation
+# ARCHER: Comprehensive Technical and Architectural Documentation
 
 ---
 
@@ -190,6 +190,8 @@ Before calling the LLM, the backend analyzes user intent:
 | `POST` | `/api/documents/upload-zip` | Upload and securely extract a ZIP archive of PDFs | Optional |
 | `GET` | `/api/documents` | List documents with search, author, and year filters | Optional |
 | `GET` | `/api/documents/{id}` | Get document metadata, chunks, and section outline | Optional |
+| `GET` | `/api/documents/{id}/status` | Lightweight status endpoint for single-document ingestion progress | Optional |
+| `POST` | `/api/documents/{id}/retry` | Re-queue and re-index an existing document | Optional |
 | `GET` | `/api/documents/{id}/file` | Stream physical PDF file to the client viewer | Optional |
 | `DELETE` | `/api/documents/{id}` | Delete a document and its vector embeddings | Optional |
 | `POST` | `/api/documents/bulk-delete` | Bulk delete multiple documents by ID list | Optional |
