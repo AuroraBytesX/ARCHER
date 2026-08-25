@@ -9,6 +9,7 @@ from app.core.logging import logger
 router = APIRouter()
 
 @router.get("/health")
+@router.head("/health")
 async def health_check():
     # 1. Database Check
     db_status = "connected"
