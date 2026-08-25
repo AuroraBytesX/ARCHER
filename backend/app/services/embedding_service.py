@@ -354,12 +354,12 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
                     if resp.status_code == 200:
                         all_embeddings.extend(resp.json())
                     else:
-                        logger.warning(f"[EMBEDDING] Cloud API returned {resp.status_code}: {resp.text[:100]}. Falling back to local ONNX/CPU.")
-                        fallback_emb = FastEmbedProvider().embed_documents(chunk_batch)
+                        logger.warning(f"[EMBEDDING] Cloud API returned {resp.status_code}. Using deterministic fallback.")
+                        fallback_emb = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(chunk_batch)
                         all_embeddings.extend(fallback_emb)
             except Exception as e:
-                logger.warning(f"[EMBEDDING] Cloud API connection note: {e}. Using local ONNX/CPU provider.")
-                fallback_emb = FastEmbedProvider().embed_documents(chunk_batch)
+                logger.warning(f"[EMBEDDING] Cloud API connection note: {e}. Using deterministic fallback.")
+                fallback_emb = MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(chunk_batch)
                 all_embeddings.extend(fallback_emb)
         return all_embeddings
 
@@ -377,10 +377,10 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
                     data = resp.json()
                     return data[0] if isinstance(data, list) and isinstance(data[0], list) else data
                 else:
-                    return FastEmbedProvider().embed_query(text)
+                    return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_query(text)
         except Exception as e:
-            logger.warning(f"[EMBEDDING] Cloud query note: {e}. Using local ONNX/CPU provider.")
-            return FastEmbedProvider().embed_query(text)
+            logger.warning(f"[EMBEDDING] Cloud query note: {e}. Using deterministic fallback.")
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_query(text)
 
 
 # ============================================================
