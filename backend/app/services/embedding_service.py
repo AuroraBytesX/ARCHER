@@ -298,25 +298,25 @@ class FastEmbedProvider(EmbeddingProvider):
             return []
         model = self._get_model()
         if model is None:
-            return SentenceTransformerProvider().embed_documents(texts, batch_size=batch_size)
+            return CloudAPIEmbeddingProvider().embed_documents(texts, batch_size=batch_size)
         try:
             embeddings = list(model.embed(texts, batch_size=min(batch_size, 16)))
             return [e.tolist() for e in embeddings]
         except Exception as e:
-            logger.error(f"[EMBEDDING] FastEmbed batch error: {e}", exc_info=True)
-            return SentenceTransformerProvider().embed_documents(texts, batch_size=batch_size)
+            logger.error(f"[EMBEDDING] FastEmbed batch error: {e}. Falling back to Cloud API.", exc_info=True)
+            return CloudAPIEmbeddingProvider().embed_documents(texts, batch_size=batch_size)
 
     def embed_query(self, text: str) -> List[float]:
         if not text or not text.strip():
             raise ValueError("Cannot embed an empty query.")
         model = self._get_model()
         if model is None:
-            return SentenceTransformerProvider().embed_query(text)
+            return CloudAPIEmbeddingProvider().embed_query(text)
         try:
             return list(model.embed([text]))[0].tolist()
         except Exception as e:
-            logger.error(f"[EMBEDDING] FastEmbed query error: {e}", exc_info=True)
-            return SentenceTransformerProvider().embed_query(text)
+            logger.error(f"[EMBEDDING] FastEmbed query error: {e}. Falling back to Cloud API.", exc_info=True)
+            return CloudAPIEmbeddingProvider().embed_query(text)
 
 
 # ============================================================
