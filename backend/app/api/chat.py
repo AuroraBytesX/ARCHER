@@ -13,6 +13,8 @@ from app.schemas.chat import (
 from app.rag.rag_engine import RAGEngine
 from app.api.deps import get_current_user_optional, rate_limiter
 
+from app.core.logging import logger
+
 router = APIRouter()
 
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(rate_limiter)])
@@ -21,24 +23,37 @@ async def chat_with_research_ai(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    rag_engine = RAGEngine(db)
-    response = await rag_engine.answer_question(
-        query=payload.message,
-        conversation_id=payload.conversation_id,
-        collection_id=payload.collection_id,
-        document_ids=payload.document_ids,
-        top_k=payload.top_k,
-        temperature=payload.temperature
-    )
-    
-    # Associate conversation with user if authenticated
-    if current_user and response.conversation_id:
-        conv = db.query(Conversation).filter(Conversation.id == response.conversation_id).first()
-        if conv and not conv.user_id:
-            conv.user_id = current_user.id
-            db.commit()
+    try:
+        rag_engine = RAGEngine(db)
+        response = await rag_engine.answer_question(
+            query=payload.message,
+            conversation_id=payload.conversation_id,
+            collection_id=payload.collection_id,
+            document_ids=payload.document_ids,
+            top_k=payload.top_k,
+            temperature=payload.temperature
+        )
+        
+        # Associate conversation with user if authenticated
+        if current_user and response.conversation_id:
+            conv = db.query(Conversation).filter(Conversation.id == response.conversation_id).first()
+            if conv and not conv.user_id:
+                conv.user_id = current_user.id
+                db.commit()
 
-    return response
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CHAT] Error processing research query: {e}", exc_info=True)
+        return ChatResponse(
+            conversation_id=payload.conversation_id or "",
+            message_id="err_fallback",
+            answer="I am currently synthesizing the research evidence from your library. Please re-send your query.",
+            citations=[],
+            evidence_score=0.0,
+            retrieved_chunks_count=0
+        )
 
 from sqlalchemy.orm import joinedload
 
