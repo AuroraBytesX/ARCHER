@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import numpy as np
-import torch
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -19,11 +18,6 @@ os.environ["OPENBLAS_NUM_THREADS"] = str(_num_threads)
 os.environ["OMP_NUM_THREADS"] = str(_num_threads)
 os.environ["MKL_NUM_THREADS"] = str(_num_threads)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-try:
-    torch.set_num_threads(_num_threads)
-except Exception:
-    pass
 
 
 # ============================================================
