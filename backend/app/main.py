@@ -22,24 +22,8 @@ async def lifespan(app: FastAPI):
             provider = get_embedding_provider()
             provider.embed_query("warmup query")
             logger.info("Embedding provider pre-warmed successfully in background.")
-
-            # Idempotent benchmark library initialization for cloud/local deployment
-            from app.db.session import SessionLocal
-            from app.models.document import Document, DocumentStatus
-            db = SessionLocal()
-            try:
-                ready_count = db.query(Document).filter(Document.status == DocumentStatus.READY.value).count()
-                if ready_count == 0:
-                    logger.info("[SEED] Empty database detected. Auto-seeding benchmark research papers...")
-                    try:
-                        from scripts.seed_database import seed
-                        seed()
-                    except Exception as seed_err:
-                        logger.warning(f"[SEED] Auto-seed warning: {seed_err}")
-            finally:
-                db.close()
         except Exception as e:
-            logger.warning(f"Embedding warmup / auto-seed note: {e}")
+            logger.warning(f"Embedding warmup note: {e}")
 
     threading.Thread(target=_warmup, daemon=True).start()
     yield

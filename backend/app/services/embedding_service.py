@@ -13,11 +13,12 @@ from app.core.logging import logger
 # CPU CONFIGURATION
 # ============================================================
 
-_num_threads = min(8, os.cpu_count() or 4)
+_num_threads = min(2, os.cpu_count() or 2)
 
 os.environ["OPENBLAS_NUM_THREADS"] = str(_num_threads)
 os.environ["OMP_NUM_THREADS"] = str(_num_threads)
 os.environ["MKL_NUM_THREADS"] = str(_num_threads)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 try:
     torch.set_num_threads(_num_threads)
@@ -153,21 +154,19 @@ class SentenceTransformerProvider(EmbeddingProvider):
 
         actual_batch = min(
             max(batch_size, 1),
-            32,
+            8,
         )
 
         all_embeddings: List[List[float]] = []
 
         try:
-
+            import gc
             with torch.inference_mode():
-
                 for i in range(
                     0,
                     len(texts),
                     actual_batch,
                 ):
-
                     batch = texts[
                         i:i + actual_batch
                     ]
@@ -183,6 +182,7 @@ class SentenceTransformerProvider(EmbeddingProvider):
                     all_embeddings.extend(
                         embeddings.tolist()
                     )
+            gc.collect()
 
             if len(all_embeddings) != len(texts):
 
