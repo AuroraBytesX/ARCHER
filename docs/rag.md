@@ -19,20 +19,22 @@ ARCHER implements a zero-hallucination, citation-grounded Retrieval-Augmented Ge
       └─────────────────────────┴─────────────► [ Reciprocal Score Fusion ]
                                                        │
                                                        ▼
-                                            [ Filtered Top-K (K=8) ]
+                                            [ Filtered Top-K (K=4) ]
                                                        │
                                                        ▼
                                             [ Context & Evidence Assembly ]
                                             - Tag: [Paper Title, p. X]
-                                            - Quote Excerpts
+                                            - Max 450 chars/excerpt (TPM Safety)
                                                        │
                                                        ▼
-                                            [ LLM Provider:Groq/ Ollama ]
-                                            - Strict Grounding System Prompt
+                                            [ LLM: Groq (gpt-oss-20b/120b) ]
+                                            - Natural Grounding System Prompt
+                                            - Reasoning Tag (<think>) Stripping
                                             - Output: Synthesized Response
                                                        │
                                                        ▼
-                                            [ Citation Grounding Parser ]
+                                            [ Frontend MarkdownRenderer ]
+                                            - Renders Styled UI Tables & Cards
                                             - Links [Title, p. X] -> Page & Chunk
                                             - Calculates Evidence Coverage Score
 ```
