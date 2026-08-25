@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
 
     # Embedding Provider
-    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "sentence_transformers")
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "fastembed")
     EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-en-v1.5")
     EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
     EMBEDDING_DIMENSION: int = 384
