@@ -19,6 +19,7 @@ import {
 import { api } from '../services/api';
 import { ConversationItem, MessageItem, CitationItem, DocumentItem, CollectionItem } from '../types';
 import { CitationBadge } from '../components/CitationBadge';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { useUser } from '../context/UserContext';
 
 export const ChatPage: React.FC = () => {
@@ -435,7 +436,11 @@ export const ChatPage: React.FC = () => {
                       : 'bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 shadow-xs'
                   }`}
                 >
-                  <div className="whitespace-pre-line">{msg.content}</div>
+                  {msg.role === 'assistant' ? (
+                    <MarkdownRenderer content={msg.content} />
+                  ) : (
+                    <div className="whitespace-pre-line">{msg.content}</div>
+                  )}
 
                   {/* Citations List on Assistant Answer */}
                   {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
