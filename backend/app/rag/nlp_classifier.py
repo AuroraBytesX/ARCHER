@@ -3,12 +3,11 @@ from typing import Tuple
 
 GIBBERISH_PATTERNS = [
     r"^(asdf|qwerty|zxcv|hjkl|1234|qwer|test|testing|foo|bar|baz)+\b",
-    r"^([a-z])\1{3,}", # repeated letters like aaaa, zzzz
     r"^(\?|\.|\!|\-|\_|\=|\+)+$", # pure symbols
 ]
 
 CASUAL_PATTERNS = [
-    r"^(hi|hello|hey|greetings|howdy|yo)\b",
+    r"^(hi+|hello+|hey+|greetings|howdy|yo+|helo+|hiee+|sup)\b",
     r"^(how are you|how are you doing|how's it going|how are things)\b",
     r"^(who are you|what are you|what is your name|what can you do|how do you work|help me|help)\b",
     r"^(good morning|good afternoon|good evening|good day)\b",
