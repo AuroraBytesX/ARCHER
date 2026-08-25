@@ -7,7 +7,7 @@ from app.models.user import User
 from app.core.logging import logger
 
 RATE_LIMIT_WINDOW = 60.0
-MAX_REQUESTS_PER_WINDOW = 40
+MAX_REQUESTS_PER_WINDOW = 240
 _request_history: Dict[str, List[float]] = {}
 
 def rate_limiter(request: Request):

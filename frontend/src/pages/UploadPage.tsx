@@ -292,7 +292,7 @@ export const UploadPage: React.FC = () => {
       } finally {
         isPollingRef.current = false;
       }
-    }, 1500);
+    }, 3000);
   };
 
   const handleCancelQueue = () => {
