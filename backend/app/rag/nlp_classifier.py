@@ -82,38 +82,29 @@ def classify_query_intent(text: str, has_conversation_history: bool = False) -> 
 
     if not words or is_gibberish_or_repeated(cleaned):
         return "GIBBERISH", (
-            "I did not detect a clear research inquiry. "
-            "Please ask a specific question regarding your uploaded papers, such as their algorithms, "
-            "architectural choices, datasets, empirical benchmarks, or reported limitations."
+            "I did not detect a clear inquiry. "
+            "Please ask a question regarding your research papers, architectures, datasets, benchmarks, or methodology."
         )
-
-    # Check for off-topic everyday inquiries (recipes, food, jokes, entertainment)
-    has_research_kw = any(kw in normalized for kw in RESEARCH_KEYWORDS)
-    if not has_research_kw:
-        for pat in OFF_TOPIC_PATTERNS:
-            if re.search(pat, cleaned) or re.search(pat, normalized):
-                return "OFF_TOPIC", (
-                    "I am an academic research assistant dedicated strictly to analyzing scientific literature in your library. "
-                    "I focus on methodologies, neural architectures, empirical benchmarks, and mathematical formulations from your research papers. "
-                    "Please ask a question related to your uploaded research documents."
-                )
 
     # Check for simple pleasantries
     for pat in CASUAL_PATTERNS:
         if re.search(pat, cleaned) or re.search(pat, normalized):
-            if not has_research_kw or len(words) <= 5:
+            has_research_kw = any(kw in normalized for kw in RESEARCH_KEYWORDS)
+            if not has_research_kw or len(words) <= 4:
                 if any(w in normalized for w in ["who are you", "what can you do", "what are you", "help"]):
                     return "CAPABILITY", (
                         "I am ARCHER, your citation-grounded academic research assistant. "
                         "I can extract methodologies, compare benchmark results, and answer in-depth questions "
-                        "across 14-30+ page research papers in your library with verified page citations [Paper Title, p. X]. "
-                        "Please ask a question about any paper."
+                        "across research papers in your library with verified page citations [Paper Title, p. X]. "
+                        "Please ask any question about your documents."
                     )
                 if any(w in normalized for w in ["thanks", "thank you", "thx", "ok", "okay", "cool", "nice", "great"]):
                     return "POLITENESS", "You are welcome. Feel free to ask any technical question regarding your research library."
                 return "GREETING", (
                     "Hello! How can I help with your research papers today? "
-                    "You can ask me about architectures, benchmark metrics, mathematical formulations, or paper limitations."
+                    "You can ask me about architectures, benchmark metrics, mathematical formulations, or paper comparisons."
                 )
+
+    return "RESEARCH_QUERY", ""
 
     return "RESEARCH_QUERY", ""

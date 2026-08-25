@@ -35,6 +35,8 @@ class RAGEngine:
         5. LLM generation with strict citation grounding
         6. Evidence linking and conversation storage
         """
+        trimmed_query = (query or "").strip()
+
         # 1. Conversational context loading
         conversation_history: List[Dict[str, str]] = []
         if conversation_id:

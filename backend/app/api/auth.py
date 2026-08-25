@@ -73,13 +73,17 @@ def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password."
         )
 
+    # Automatically renew user's 500-query quota on login
+    from app.api.deps import reset_user_rate_limit
+    reset_user_rate_limit(str(user.id))
+
     return AuthResponse(
         access_token=user.id,
         user_id=user.id,
         email=user.email,
         name=user.name,
         tier="registered",
-        message="Sign in successful."
+        message="Sign in successful. 500 query quota renewed."
     )
 
 @router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)

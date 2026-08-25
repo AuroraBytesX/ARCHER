@@ -99,6 +99,12 @@ def query_rate_limiter(
 
     _query_history[client_key].append(current_time)
 
+def reset_user_rate_limit(user_id: str):
+    """Resets the query quota when a user logs in."""
+    client_key = f"user_{user_id}"
+    if client_key in _query_history:
+        _query_history[client_key] = []
+
 # Backward-compatibility alias
 rate_limiter = query_rate_limiter
 
