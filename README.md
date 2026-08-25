@@ -53,8 +53,8 @@ ARCHER solves these challenges through an open-source hybrid retrieval-augmented
   - **Guest Access**: Per-session access limited to 40 requests. Guests explore public sample papers; inquiry state is scoped per session and resets on page refresh.
 
 - **Production Cloud and Local Providers**:
-  - **Cloud LLM (Fast & Free)**: First-class integration with Groq (`openai/gpt-oss-20b` and Llama-3) delivering 500 tokens/second at zero cost without rate-limit bottlenecks.
-  - **Embedding Acceleration**: Multi-core PyTorch CPU tensor parallelism with `torch.inference_mode()` and `batch_size = 128` (100 chunks in 0.83s, 100-page paper in 4.15s).
+  - **Cloud LLM (Fast & Free)**: First-class integration with Groq (`llama-3.3-70b-versatile` / `compound-mini`) delivering 500 tokens/second at zero cost without rate-limit bottlenecks.
+  - **Embedding Acceleration (FastEmbed ONNX & CPU)**: FastEmbed ONNX runtime (~35MB RAM footprint) and SentenceTransformers with 384-dimensional cosine embeddings, perfectly optimized for 512MB cloud free tiers and local CPU.
   - **Email Dispatch**: Native Resend Cloud API support with Gmail SMTP fallback for password recovery and developer contact messages.
   - **Database**: Serverless PostgreSQL with direct compute connection and native `pgvector` on Neon.
   - **Mobile-Responsive UI**: Fluid layouts with automatic filename truncation and dedicated touch navigation drawers.
