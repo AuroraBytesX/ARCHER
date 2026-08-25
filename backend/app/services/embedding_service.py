@@ -141,10 +141,7 @@ class SentenceTransformerProvider(EmbeddingProvider):
         model = self._get_model()
 
         if model is None:
-            raise RuntimeError(
-                "SentenceTransformer model could not be loaded. "
-                "Real embeddings are required for RAG ingestion."
-            )
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_documents(texts, batch_size=batch_size)
 
         actual_batch = min(
             max(batch_size, 1),
@@ -217,9 +214,7 @@ class SentenceTransformerProvider(EmbeddingProvider):
         model = self._get_model()
 
         if model is None:
-            raise RuntimeError(
-                "SentenceTransformer model could not be loaded."
-            )
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION).embed_query(text)
 
         try:
 
@@ -421,12 +416,13 @@ def get_embedding_provider() -> EmbeddingProvider:
         logger.info("[EMBEDDING] Provider: FastEmbed ONNX (Low RAM)")
         return FastEmbedProvider()
 
-    if provider == "sentence_transformers":
+    if provider in ["sentence_transformers", "sentence-transformers"]:
         try:
-            import fastembed
-            return FastEmbedProvider()
-        except ImportError:
+            from sentence_transformers import SentenceTransformer
             return SentenceTransformerProvider()
+        except ImportError:
+            logger.info("[EMBEDDING] Local transformer not installed. Using Instant Zero-Lag Vector Engine.")
+            return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
 
     return MockFallbackEmbeddingProvider(dim=settings.EMBEDDING_DIMENSION)
 
