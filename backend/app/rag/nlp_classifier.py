@@ -63,47 +63,43 @@ def classify_query_intent(text: str, has_conversation_history: bool = False) -> 
     """
     NLP Intent Classifier:
     Returns (intent_type, message)
-    intent_type: 'GIBBERISH' | 'GREETING' | 'POLITENESS' | 'CAPABILITY' | 'OFF_TOPIC' | 'RESEARCH_QUERY'
+    intent_type: 'GIBBERISH' | 'GREETING' | 'POLITENESS' | 'CAPABILITY' | 'RESEARCH_QUERY'
     """
     cleaned = text.strip().lower()
     normalized = re.sub(r"[^\w\s]", " ", cleaned).strip()
     words = normalized.split()
 
-    # 1. Follow-up commands are always valid research queries
-    for pat in FOLLOW_UP_PATTERNS:
-        if re.search(pat, cleaned) or re.search(pat, normalized):
-            return "RESEARCH_QUERY", ""
-
-    # If conversation exists, short sub-questions are always treated as research queries
-    if has_conversation_history and len(words) >= 1:
-        if not is_gibberish_or_repeated(cleaned):
-            return "RESEARCH_QUERY", ""
-
     if not words or is_gibberish_or_repeated(cleaned):
         return "GIBBERISH", (
-            "I did not detect a clear inquiry. "
-            "Please ask a question regarding your research papers, architectures, datasets, benchmarks, or methodology."
+            "I couldn't understand that. Please ask a specific question about your uploaded research papers."
         )
 
-    # Check for simple pleasantries
+    # 1. Check for simple pleasantries and greetings FIRST (always fires even in ongoing chats)
     for pat in CASUAL_PATTERNS:
         if re.search(pat, cleaned) or re.search(pat, normalized):
             has_research_kw = any(kw in normalized for kw in RESEARCH_KEYWORDS)
             if not has_research_kw or len(words) <= 4:
                 if any(w in normalized for w in ["who are you", "what can you do", "what are you", "help"]):
                     return "CAPABILITY", (
-                        "I am ARCHER, your citation-grounded academic research assistant. "
-                        "I can extract methodologies, compare benchmark results, and answer in-depth questions "
-                        "across research papers in your library with verified page citations [Paper Title, p. X]. "
-                        "Please ask any question about your documents."
+                        "I am ARCHER, your citation-grounded research assistant. "
+                        "I can extract methodologies, compare benchmark results, and answer questions "
+                        "about your research papers with verified page citations [Paper Title, p. X]. "
+                        "What would you like to explore?"
                     )
                 if any(w in normalized for w in ["thanks", "thank you", "thx", "ok", "okay", "cool", "nice", "great"]):
-                    return "POLITENESS", "You are welcome. Feel free to ask any technical question regarding your research library."
+                    return "POLITENESS", "You're welcome! Feel free to ask any question about your research papers."
                 return "GREETING", (
                     "Hello! How can I help with your research papers today? "
-                    "You can ask me about architectures, benchmark metrics, mathematical formulations, or paper comparisons."
+                    "You can ask me about methodologies, architectures, datasets, or paper comparisons."
                 )
 
-    return "RESEARCH_QUERY", ""
+    # 2. Follow-up commands & sub-questions are always valid research queries
+    for pat in FOLLOW_UP_PATTERNS:
+        if re.search(pat, cleaned) or re.search(pat, normalized):
+            return "RESEARCH_QUERY", ""
+
+    # 3. If conversation exists, short sub-questions are treated as research queries
+    if has_conversation_history and len(words) >= 1:
+        return "RESEARCH_QUERY", ""
 
     return "RESEARCH_QUERY", ""

@@ -171,6 +171,17 @@ class GroqProvider(OpenAICompatibleProvider):
                             if choices:
                                 content = choices[0].get("message", {}).get("content", "").strip()
                                 if content:
+                                    # Strip internal thinking tokens
+                                    content = re.sub(r"<think>[\s\S]*?</think>", "", content).strip()
+                                    # Sanitize unicode special spaces & symbols
+                                    content = (
+                                        content.replace("\u202f", " ")
+                                        .replace("\u2009", " ")
+                                        .replace("\u200b", "")
+                                        .replace("\u2013", "-")
+                                        .replace("\u2014", "-")
+                                        .replace("\u2212", "-")
+                                    )
                                     return content
                         else:
                             logger.warning(f"Groq {mdl} status {resp.status_code}: {resp.text[:120]}")
