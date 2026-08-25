@@ -271,16 +271,16 @@ class FastEmbedProvider(EmbeddingProvider):
     """
     Lightweight ONNX Runtime embedding provider.
     Consumes ~35MB RAM vs ~350MB for PyTorch.
-    Produces identical 384-dimensional cosine embeddings.
+    Produces 384-dimensional cosine embeddings.
     """
     _model = None
     _model_name = None
 
     def __init__(self, model_name: str | None = None):
-        self.model_name = model_name or "sentence-transformers/all-MiniLM-L6-v2"
+        self.model_name = model_name or settings.EMBEDDING_MODEL_NAME or "BAAI/bge-small-en-v1.5"
 
     def _get_model(self):
-        if FastEmbedProvider._model is not None:
+        if FastEmbedProvider._model is not None and FastEmbedProvider._model_name == self.model_name:
             return FastEmbedProvider._model
         try:
             logger.info(f"[EMBEDDING] Loading FastEmbed ONNX model: {self.model_name}")
@@ -333,7 +333,7 @@ class CloudAPIEmbeddingProvider(EmbeddingProvider):
         self.api_url = (
             api_url
             or os.getenv("EMBEDDING_API_URL")
-            or "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+            or f"https://api-inference.huggingface.co/pipeline/feature-extraction/{settings.EMBEDDING_MODEL_NAME}"
         )
         self.api_key = api_key or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY") or ""
 

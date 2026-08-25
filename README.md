@@ -54,7 +54,7 @@ ARCHER solves these challenges through an open-source hybrid retrieval-augmented
 
 - **Production Cloud and Local Providers**:
   - **Cloud LLM (Fast & Free)**: First-class integration with Groq (`llama-3.3-70b-versatile` / `compound-mini`) delivering 500 tokens/second at zero cost without rate-limit bottlenecks.
-  - **Embedding Acceleration (FastEmbed ONNX & CPU)**: FastEmbed ONNX runtime (~35MB RAM footprint) and SentenceTransformers with 384-dimensional cosine embeddings, perfectly optimized for 512MB cloud free tiers and local CPU.
+  - **Embedding Acceleration (FastEmbed ONNX & BAAI/bge-small-en-v1.5)**: FastEmbed ONNX runtime (~35MB RAM footprint) with BAAI/bge-small-en-v1.5 384-dimensional cosine embeddings, perfectly optimized for 512MB cloud free tiers and local CPU.
   - **Email Dispatch**: Native Resend Cloud API support with Gmail SMTP fallback for password recovery and developer contact messages.
   - **Database**: Serverless PostgreSQL with direct compute connection and native `pgvector` on Neon.
   - **Mobile-Responsive UI**: Fluid layouts with automatic filename truncation and dedicated touch navigation drawers.
