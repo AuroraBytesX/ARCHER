@@ -6,6 +6,46 @@ from app.db.session import get_db
 from app.models.user import User
 from app.core.logging import logger
 
+def get_current_user_optional(
+    authorization: Optional[str] = Header(None),
+    x_user_email: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Returns the authenticated User if valid token or email header is provided.
+    Returns None for guest users.
+    """
+    if x_user_email:
+        clean_email = x_user_email.strip().lower()
+        user = db.query(User).filter(User.email == clean_email).first()
+        if user:
+            return user
+
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1].strip()
+        user = db.query(User).filter(
+            (User.id == token) | (User.reset_token == token)
+        ).first()
+        if user:
+            return user
+
+    return None
+
+
+def get_current_user_required(
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> User:
+    """
+    Enforces authentication for protected endpoints.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please sign in to access this feature."
+        )
+    return current_user
+
+
 QUERY_RATE_LIMIT_WINDOW = 60.0
 GUEST_MAX_QUERIES = 40
 REGISTERED_MAX_QUERIES = 500
@@ -62,42 +102,3 @@ def query_rate_limiter(
 # Backward-compatibility alias
 rate_limiter = query_rate_limiter
 
-
-def get_current_user_optional(
-    authorization: Optional[str] = Header(None),
-    x_user_email: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
-    """
-    Returns the authenticated User if valid token or email header is provided.
-    Returns None for guest users.
-    """
-    if x_user_email:
-        clean_email = x_user_email.strip().lower()
-        user = db.query(User).filter(User.email == clean_email).first()
-        if user:
-            return user
-
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1].strip()
-        user = db.query(User).filter(
-            (User.id == token) | (User.reset_token == token)
-        ).first()
-        if user:
-            return user
-
-    return None
-
-
-def get_current_user_required(
-    current_user: Optional[User] = Depends(get_current_user_optional)
-) -> User:
-    """
-    Enforces authentication for protected endpoints.
-    """
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Please sign in to access this feature."
-        )
-    return current_user
