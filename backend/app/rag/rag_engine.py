@@ -35,10 +35,19 @@ class RAGEngine:
         5. LLM generation with strict citation grounding
         6. Evidence linking and conversation storage
         """
-        trimmed_query = query.strip()
+        # 1. Conversational context loading
+        conversation_history: List[Dict[str, str]] = []
+        if conversation_id:
+            conv = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
+            if conv and conv.messages:
+                for m in conv.messages[-6:]:
+                    conversation_history.append({"role": m.role, "content": m.content})
 
-        # 1. NLP Query Intent Classification
-        intent_type, intent_message = classify_query_intent(trimmed_query)
+        # 2. NLP Query Intent Classification with Conversation Awareness
+        intent_type, intent_message = classify_query_intent(
+            trimmed_query,
+            has_conversation_history=bool(conversation_history)
+        )
         if intent_type in ["GREETING", "POLITENESS", "CAPABILITY", "GIBBERISH", "OFF_TOPIC"]:
             conv_id, msg_id = self._save_conversation(conversation_id, trimmed_query, intent_message, [])
             return ChatResponse(
@@ -50,23 +59,17 @@ class RAGEngine:
                 retrieved_chunks_count=0
             )
 
-        # 2. Conversational context loading
-        conversation_history: List[Dict[str, str]] = []
-        if conversation_id:
-            conv = self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
-            if conv and conv.messages:
-                for m in conv.messages[-6:]:
-                    conversation_history.append({"role": m.role, "content": m.content})
-
-        # Query Expansion / Pronoun Resolution for Follow-up Questions
+        # 3. Query Expansion & Sub-Question Resolution
         effective_retrieval_query = trimmed_query
         if conversation_history:
-            last_user_msg = next((m["content"] for m in reversed(conversation_history) if m["role"] == "user"), "")
-            # If query is short or has pronouns like "they", "this method", "it"
-            if len(trimmed_query.split()) < 7 or any(p in trimmed_query.lower() for p in ["they", "it", "this method", "this paper", "the authors", "why did they"]):
-                effective_retrieval_query = f"{last_user_msg} {trimmed_query}"
+            last_user_msgs = [m["content"] for m in reversed(conversation_history) if m["role"] == "user"]
+            if last_user_msgs:
+                last_user_msg = last_user_msgs[0]
+                # If query is short or a follow-up ("in short", "why", "summarize", "what about")
+                if len(trimmed_query.split()) < 8 or any(p in trimmed_query.lower() for p in ["they", "it", "this method", "this paper", "the authors", "why", "in short", "summary", "briefly", "what about"]):
+                    effective_retrieval_query = f"{last_user_msg} {trimmed_query}"
 
-        # 3. Retrieve
+        # 4. Retrieve
         retrieved_chunks = self.retriever.retrieve(
             query=effective_retrieval_query,
             top_k=top_k,

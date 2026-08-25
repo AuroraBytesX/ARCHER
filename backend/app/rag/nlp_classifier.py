@@ -53,7 +53,14 @@ OFF_TOPIC_PATTERNS = [
     r"\b(buy|sell|price of|crypto|bitcoin|stock price|shop|shopping)\b",
 ]
 
-def classify_query_intent(text: str) -> Tuple[str, str]:
+FOLLOW_UP_PATTERNS = [
+    r"^(in short|briefly|in brief|summarize|summary|shorter|concise|tldr|tl;dr|simplify|simple terms)\b",
+    r"^(explain more|more detail|tell me more|expand|go deeper|clarify|elaborate)\b",
+    r"^(why|how|what about|and then|what else|compared to|which one|what if)\b",
+    r"^(give me\b|list\b|show me\b|bullet\b)",
+]
+
+def classify_query_intent(text: str, has_conversation_history: bool = False) -> Tuple[str, str]:
     """
     NLP Intent Classifier:
     Returns (intent_type, message)
@@ -62,6 +69,16 @@ def classify_query_intent(text: str) -> Tuple[str, str]:
     cleaned = text.strip().lower()
     normalized = re.sub(r"[^\w\s]", " ", cleaned).strip()
     words = normalized.split()
+
+    # 1. Follow-up commands are always valid research queries
+    for pat in FOLLOW_UP_PATTERNS:
+        if re.search(pat, cleaned) or re.search(pat, normalized):
+            return "RESEARCH_QUERY", ""
+
+    # If conversation exists, short sub-questions are always treated as research queries
+    if has_conversation_history and len(words) >= 1:
+        if not is_gibberish_or_repeated(cleaned):
+            return "RESEARCH_QUERY", ""
 
     if not words or is_gibberish_or_repeated(cleaned):
         return "GIBBERISH", (
