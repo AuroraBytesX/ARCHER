@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Mail, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
@@ -113,9 +113,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">Your Name</label>
+              <label htmlFor="contact-name" className="font-semibold text-slate-700 dark:text-slate-300">Your Name</label>
               <input
+                id="contact-name"
+                name="name"
                 type="text"
+                autoComplete="name"
                 required
                 placeholder="Dr. Alex Morgan"
                 value={name}
@@ -125,9 +128,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">Your Email Address</label>
+              <label htmlFor="contact-email" className="font-semibold text-slate-700 dark:text-slate-300">Your Email Address</label>
               <input
+                id="contact-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 required
                 placeholder="you@university.edu"
                 value={email}
@@ -137,8 +143,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">Message</label>
+              <label htmlFor="contact-message" className="font-semibold text-slate-700 dark:text-slate-300">Message</label>
               <textarea
+                id="contact-message"
+                name="message"
                 required
                 rows={4}
                 placeholder="Write your research query, feature request, or feedback..."

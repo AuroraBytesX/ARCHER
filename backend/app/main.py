@@ -13,13 +13,35 @@ from app.api.router import api_router
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
     init_db()
-    try:
-        from app.services.embedding_service import get_embedding_provider
-        provider = get_embedding_provider()
-        provider.embed_query("warmup query")
-        logger.info("Embedding provider pre-warmed successfully.")
-    except Exception as e:
-        logger.warning(f"Embedding warmup note: {e}")
+    
+    # Non-blocking async background warmup so port binds in <0.5 seconds
+    import threading
+    def _warmup():
+        try:
+            from app.services.embedding_service import get_embedding_provider
+            provider = get_embedding_provider()
+            provider.embed_query("warmup query")
+            logger.info("Embedding provider pre-warmed successfully in background.")
+
+            # Idempotent benchmark library initialization for cloud/local deployment
+            from app.db.session import SessionLocal
+            from app.models.document import Document, DocumentStatus
+            db = SessionLocal()
+            try:
+                ready_count = db.query(Document).filter(Document.status == DocumentStatus.READY.value).count()
+                if ready_count == 0:
+                    logger.info("[SEED] Empty database detected. Auto-seeding benchmark research papers...")
+                    try:
+                        from scripts.seed_database import seed
+                        seed()
+                    except Exception as seed_err:
+                        logger.warning(f"[SEED] Auto-seed warning: {seed_err}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Embedding warmup / auto-seed note: {e}")
+
+    threading.Thread(target=_warmup, daemon=True).start()
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 

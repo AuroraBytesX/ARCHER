@@ -79,7 +79,15 @@ class PDFExtractionService:
                 page = doc[page_idx]
                 page_num = page_idx + 1
                 text = page.get_text("text")
+                if not text or len(text.strip()) < 10:
+                    # Multi-column / block fallback
+                    blocks = page.get_text("blocks")
+                    if blocks:
+                        text = "\n".join([b[4] for b in blocks if len(b) > 4 and isinstance(b[4], str)])
+
                 cleaned_page_text = clean_extracted_text(text)
+                if not cleaned_page_text:
+                    cleaned_page_text = f"Page {page_num} of {os.path.basename(file_path)}: Visual content."
                 
                 if page_idx == 0:
                     full_first_page_text = cleaned_page_text

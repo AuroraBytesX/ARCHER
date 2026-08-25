@@ -165,7 +165,13 @@ export const PapersPage: React.FC = () => {
         <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <label htmlFor="library-search-input" className="sr-only">
+              Search research papers
+            </label>
             <input
+              id="library-search-input"
+              name="search"
+              aria-label="Search research papers"
               type="text"
               placeholder="Search by title, author, abstract, or keyword..."
               value={searchTerm}
@@ -187,6 +193,9 @@ export const PapersPage: React.FC = () => {
           </span>
 
           <select
+            id="filter-status-select"
+            name="status"
+            aria-label="Filter by processing status"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -202,6 +211,9 @@ export const PapersPage: React.FC = () => {
           </select>
 
           <select
+            id="filter-collection-select"
+            name="collection_id"
+            aria-label="Filter by collection"
             value={collectionFilter}
             onChange={(e) => {
               setCollectionFilter(e.target.value);
@@ -218,6 +230,9 @@ export const PapersPage: React.FC = () => {
           </select>
 
           <input
+            id="filter-year-input"
+            name="year"
+            aria-label="Filter by publication year"
             type="number"
             placeholder="Year (e.g. 2023)"
             value={yearFilter}

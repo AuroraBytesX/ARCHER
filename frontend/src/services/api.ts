@@ -18,7 +18,11 @@ const BASE_URL =
 
 function buildUrl(endpoint: string, params?: Record<string, string | number | undefined>): string {
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = new URL(`${BASE_URL}${normalizedEndpoint}`);
+  const base = (BASE_URL.startsWith('http://') || BASE_URL.startsWith('https://'))
+    ? BASE_URL
+    : (typeof window !== 'undefined' ? `${window.location.origin}${BASE_URL}` : `http://localhost:5173${BASE_URL}`);
+  
+  const url = new URL(`${base}${normalizedEndpoint}`);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -53,18 +57,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
     } else {
       const text = await response.text();
       if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<!doctype')) {
-        errorDetail = `Backend server is starting up (HTTP ${response.status}). Please wait a few seconds and refresh.`;
+        errorDetail = `Backend server response (HTTP ${response.status}): HTML returned instead of JSON.`;
       } else {
         errorDetail = text.slice(0, 200) || `HTTP error ${response.status}`;
       }
     }
+    console.error(`[API Error] ${response.status} on ${response.url}:`, errorDetail);
     throw new Error(errorDetail);
   }
 
   if (!contentType.includes('application/json')) {
     const text = await response.text();
     if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<!doctype')) {
-      throw new Error('Backend server is waking up or initializing. Please retry in a few moments.');
+      const msg = 'Backend server returned HTML content instead of JSON API response.';
+      console.error(`[API Parse Error] on ${response.url}:`, msg);
+      throw new Error(msg);
     }
   }
 
@@ -133,6 +140,13 @@ export const api = {
 
   async getDocument(id: string): Promise<DocumentItem> {
     const res = await fetch(`${BASE_URL}/documents/${id}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<DocumentItem>(res);
+  },
+
+  async getDocumentStatus(id: string): Promise<DocumentItem> {
+    const res = await fetch(`${BASE_URL}/documents/${id}/status`, {
       headers: getHeaders(),
     });
     return handleResponse<DocumentItem>(res);

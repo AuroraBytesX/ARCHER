@@ -11,6 +11,8 @@ export interface DocumentItem {
   file_url?: string | null;
   page_count: number;
   status: DocumentStatus;
+  stage?: string;
+  is_duplicate?: boolean;
   error_message?: string | null;
   content_hash: string;
   collection_id?: string | null;

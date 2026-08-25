@@ -44,6 +44,11 @@ export const UploadPage: React.FC = () => {
   const zipInputRef = useRef<HTMLInputElement>(null);
   const pollTimerRef = useRef<any>(null);
   const isPollingRef = useRef<boolean>(false);
+  const itemsRef = useRef<UploadItem[]>([]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     loadCollections();
@@ -59,8 +64,8 @@ export const UploadPage: React.FC = () => {
     try {
       const res = await api.getDocuments({ limit: 6 });
       setRecentDocs(res.items || []);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[UploadPage] Error loading recent library documents:', err);
     }
   };
 
@@ -68,7 +73,8 @@ export const UploadPage: React.FC = () => {
     try {
       const data = await api.getCollections();
       setCollections(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err) {
+      console.error('[UploadPage] Error loading collections:', err);
       setCollections([]);
     }
   };
@@ -168,23 +174,38 @@ export const UploadPage: React.FC = () => {
       const filesToUpload = pdfItems.map((i) => i.file as File);
       try {
         const results = await api.uploadDocuments(filesToUpload, selectedCollection || undefined);
+        let anyReady = false;
         setItems((prev) =>
-          prev.map((item) => {
-            const matchedDoc = results.find(
-              (r) => r.filename.toLowerCase() === item.name.toLowerCase()
-            );
+          prev.map((item, idx) => {
+            if (item.isZip) return item;
+            const matchedDoc =
+              results.find(
+                (r) =>
+                  r.filename.toLowerCase() === item.name.toLowerCase() ||
+                  r.filename.toLowerCase().endsWith(item.name.toLowerCase()) ||
+                  item.name.toLowerCase().endsWith(r.filename.toLowerCase())
+              ) || results[idx] || (results.length === 1 ? results[0] : undefined);
+
             if (matchedDoc) {
               const isReady = matchedDoc.status === 'READY';
+              if (isReady) anyReady = true;
               return {
                 ...item,
                 status: isReady ? 'INDEXED' : 'EXTRACTING',
                 documentId: matchedDoc.id,
-                duplicateNotice: isReady ? `Indexed: ${matchedDoc.title}` : undefined,
+                duplicateNotice: matchedDoc.is_duplicate
+                  ? `Already indexed: ${matchedDoc.title}`
+                  : isReady
+                  ? `Indexed: ${matchedDoc.title}`
+                  : undefined,
               };
             }
             return item;
           })
         );
+        if (anyReady) {
+          loadRecentDocs();
+        }
       } catch (err: any) {
         setItems((prev) =>
           prev.map((i) =>
@@ -205,59 +226,121 @@ export const UploadPage: React.FC = () => {
       clearInterval(pollTimerRef.current);
     }
 
-    let pollCount = 0;
     pollTimerRef.current = setInterval(async () => {
-      pollCount += 1;
-      if (pollCount > 30) {
+      const activeItems = itemsRef.current.filter(
+        (i) => i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING' || i.status === 'UPLOADING'
+      );
+
+      const activeDocIds = Array.from(
+        new Set(activeItems.map((i) => i.documentId).filter(Boolean))
+      ) as string[];
+
+      if (activeDocIds.length === 0) {
         if (pollTimerRef.current) clearInterval(pollTimerRef.current);
         return;
       }
 
-      let hasActive = false;
-      setItems((prev) => {
-        hasActive = prev.some(
-          (i) => i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING' || i.status === 'UPLOADING'
-        );
-        if (!hasActive && pollTimerRef.current) {
-          clearInterval(pollTimerRef.current);
-        }
-        return prev;
-      });
-
-      if (!hasActive || isPollingRef.current) return;
+      if (isPollingRef.current) return;
 
       try {
         isPollingRef.current = true;
-        const docsRes = await api.getDocuments({ limit: 50 });
-        const docMap = new Map(docsRes.items.map((d) => [d.id, d]));
+        // Targeted single-document status requests — ZERO full library queries
+        const statusResults = await Promise.allSettled(
+          activeDocIds.map((id) => api.getDocumentStatus(id))
+        );
+
+        const statusMap = new Map<string, any>();
+        statusResults.forEach((res) => {
+          if (res.status === 'fulfilled' && res.value) {
+            statusMap.set(res.value.id, res.value);
+          }
+        });
+
+        let hasNewReadyDoc = false;
 
         setItems((prev) =>
           prev.map((item) => {
             if (!item.documentId) return item;
-            const liveDoc = docMap.get(item.documentId);
+            const liveDoc = statusMap.get(item.documentId);
             if (!liveDoc) return item;
 
             if (liveDoc.status === 'READY') {
-              return { ...item, status: 'INDEXED' };
+              if (item.status !== 'INDEXED') hasNewReadyDoc = true;
+              return { ...item, status: 'INDEXED', error: undefined };
             } else if (liveDoc.status === 'FAILED') {
-              return { ...item, status: 'FAILED', error: liveDoc.error_message || 'Indexing failed' };
+              return {
+                ...item,
+                status: 'FAILED',
+                error: liveDoc.error_message || 'Indexing failed during server extraction.',
+              };
             } else if (liveDoc.status === 'INDEXING') {
               return { ...item, status: 'EMBEDDING' };
             } else if (liveDoc.status === 'PROCESSING') {
               return { ...item, status: 'CHUNKING' };
+            } else if (liveDoc.status === 'UPLOADED') {
+              return { ...item, status: 'EXTRACTING' };
             }
             return item;
           })
         );
-      } catch {
-        // Silently skip transient network fluctuations during background polling
+
+        if (hasNewReadyDoc) {
+          loadRecentDocs();
+        }
+      } catch (err) {
+        console.error('[UploadPage] Ingestion status check error:', err);
       } finally {
         isPollingRef.current = false;
       }
-    }, 2000);
+    }, 1500);
+  };
+
+  const handleCancelQueue = () => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+    }
+    setItems((prev) =>
+      prev.map((i) =>
+        i.status === 'UPLOADING' || i.status === 'EXTRACTING' || i.status === 'CHUNKING' || i.status === 'EMBEDDING'
+          ? { ...i, status: 'FAILED', error: 'Ingestion cancelled by user.' }
+          : i
+      )
+    );
+    setIsUploading(false);
   };
 
   const handleRetry = async (item: UploadItem) => {
+    if (item.file && !item.isZip) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, status: 'UPLOADING', error: undefined } : i))
+      );
+      try {
+        const results = await api.uploadDocuments([item.file], selectedCollection || undefined);
+        const doc = results[0];
+        if (doc) {
+          const isReady = doc.status === 'READY';
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === item.id
+                ? {
+                    ...i,
+                    status: isReady ? 'INDEXED' : 'EXTRACTING',
+                    documentId: doc.id,
+                    duplicateNotice: isReady ? `Indexed: ${doc.title}` : undefined,
+                  }
+                : i
+            )
+          );
+          if (!isReady) pollProcessingStatuses();
+        }
+      } catch (err: any) {
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? { ...i, status: 'FAILED', error: err.message } : i))
+        );
+      }
+      return;
+    }
+
     if (!item.documentId) return;
     try {
       await api.retryDocument(item.documentId);
@@ -266,7 +349,9 @@ export const UploadPage: React.FC = () => {
       );
       pollProcessingStatuses();
     } catch (e: any) {
-      alert(`Retry failed: ${e.message}`);
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, status: 'FAILED', error: e.message } : i))
+      );
     }
   };
 
@@ -346,7 +431,12 @@ export const UploadPage: React.FC = () => {
         {/* Inline Create Form if active */}
         {showNewCollection && (
           <form onSubmit={handleCreateCollection} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-brand-500/50 flex flex-wrap items-center gap-2 animate-in fade-in duration-150">
+            <label htmlFor="new-collection-name" className="sr-only">
+              Workspace Collection Name
+            </label>
             <input
+              id="new-collection-name"
+              name="collection_name"
               type="text"
               placeholder="e.g. LLM Reasoning, Vision-Language Models"
               value={newCollectionName}
@@ -433,6 +523,9 @@ export const UploadPage: React.FC = () => {
         }`}
       >
         <input
+          id="research-paper-file-input"
+          name="files"
+          aria-label="Upload PDF or ZIP research paper files"
           type="file"
           ref={fileInputRef}
           multiple
@@ -500,6 +593,16 @@ export const UploadPage: React.FC = () => {
               >
                 Clear All
               </button>
+              {items.some((i) => ['UPLOADING', 'EXTRACTING', 'CHUNKING', 'EMBEDDING'].includes(i.status)) && (
+                <button
+                  type="button"
+                  onClick={handleCancelQueue}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Cancel Ingestion</span>
+                </button>
+              )}
               {items.some((i) => i.status === 'PENDING') && (
                 <button
                   onClick={handleUploadAll}

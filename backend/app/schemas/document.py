@@ -43,6 +43,9 @@ class DocumentResponse(DocumentBase):
     file_url: Optional[str] = None
     page_count: int
     status: str
+    stage: Optional[str] = None
+    chunks_count: Optional[int] = 0
+    is_duplicate: bool = False
     error_message: Optional[str] = None
     content_hash: str
     created_at: datetime

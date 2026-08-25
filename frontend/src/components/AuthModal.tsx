@@ -210,13 +210,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label htmlFor="auth-name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Full Name
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
+                  id="auth-name"
+                  name="name"
                   type="text"
+                  autoComplete="name"
                   placeholder="e.g. Dr. Alex Morgan"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -227,13 +230,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <label htmlFor="auth-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               Email Address
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
+                id="auth-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 required
                 placeholder="researcher@university.edu"
                 value={email}
@@ -245,13 +251,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           {mode === 'reset' && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label htmlFor="auth-reset-token" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 6-Digit Recovery Code
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
+                  id="auth-reset-token"
+                  name="token"
                   type="text"
+                  autoComplete="one-time-code"
                   required
                   maxLength={6}
                   placeholder="e.g. 481920"
@@ -266,7 +275,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           {mode !== 'forgot' && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="auth-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   {mode === 'reset' ? 'New Password' : 'Password'}
                 </label>
                 {mode === 'login' && (
@@ -282,7 +291,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
+                  id="auth-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   required
                   placeholder="At least 6 characters"
                   value={password}
@@ -293,6 +305,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -302,13 +315,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           {(mode === 'signup' || mode === 'reset') && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label htmlFor="auth-confirm-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Confirm {mode === 'reset' ? 'New Password' : 'Password'}
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
+                  id="auth-confirm-password"
+                  name="confirm_password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
                   required
                   placeholder="Re-enter password"
                   value={confirmPassword}
